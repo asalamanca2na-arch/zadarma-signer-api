@@ -9,7 +9,7 @@ y el equipo vea los resultados en tiempo real y las mesas con incidencias.
 
 ## Cómo funciona (apoderado)
 
-1. Entra con su **teléfono + PIN** (mejor probarlo antes del día de la votación).
+1. Abre el enlace: **no hace falta iniciar sesión**. Opcionalmente escribe su nombre (el móvil lo recuerda).
 2. **Saca la foto del acta** (o la sube desde la galería, o la introduce sin foto).
 3. **Paso 1 · Mesa**: provincia, municipio, distrito, sección y mesa. Si se ha cargado el listado
    de mesas, la elige de una lista. Recuerda la última mesa usada.
@@ -27,7 +27,10 @@ y el equipo vea los resultados en tiempo real y las mesas con incidencias.
   mesa fuera del listado, observaciones del apoderado, dos versiones distintas de la misma mesa.
   Cada acta se abre con la foto, los datos y las versiones anteriores, y se puede marcar como revisada.
 - **Exportar CSV** (se abre en Excel) para preparar el Escrutinio General.
-- **Configuración**: nombre de la elección, candidaturas y colores, alta de apoderados y listado de mesas.
+- **Configuración**: nombre de la elección, candidaturas y colores, y listado de mesas.
+
+> La app de los apoderados está **abierta**: cualquiera con el enlace puede enviar actas. Compártelo solo con tu equipo.
+> El panel `/admin` sí está protegido con contraseña.
 
 ## Puesta en marcha
 
@@ -44,8 +47,7 @@ Después, en **Configuración**:
 
 1. Revisa las **candidaturas**. Vienen precargadas las del **Congreso, generales 29-N-2026**, tal como las proclamó el
    BOE-A-2026-23103: en cada provincia salen solo las que se presentan allí y en el orden del acta.
-2. Carga los **apoderados** con un CSV `telefono;nombre;pin` (ver `ejemplos/apoderados.csv`).
-3. (Recomendado) Carga el **listado de mesas** con un CSV `provincia;municipio;distrito;seccion;mesa;electores`
+2. (Recomendado) Carga el **listado de mesas** con un CSV `provincia;municipio;distrito;seccion;mesa;electores`
    (ver `ejemplos/mesas.csv`). Se puede preparar a partir de los datos de mesas que publica la Junta Electoral / el Idescat.
 
 ### Publicarla en internet (Render, recomendado)
@@ -71,7 +73,7 @@ Variables de entorno: `PORT` (3000), `ADMIN_PASSWORD`, `DATA_DIR` (`./data`), `A
 | App del partido | Esta versión |
 |---|---|
 | App nativa Android/iOS | Web app (sin instalar nada) |
-| Código por SMS | Teléfono + PIN (sin coste de SMS) |
+| Código por SMS | Acceso abierto con el enlace (nombre opcional) |
 | Lectura automática del acta (OCR) | Introducción manual + foto como prueba |
 | Recorte automático de esquinas | Foto entera, con botón de girar |
 

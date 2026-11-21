@@ -13,30 +13,16 @@
 <body>
 <div class="app">
 
-  <!-- LOGIN -->
-  <section id="s-login" class="screen">
-    <img class="logo" src="/icon.svg" alt="">
-    <h1 class="center">Recuento de actas</h1>
-    <p class="center muted">Entra con tu teléfono y el PIN que te ha dado el partido.</p>
-    <form id="f-login" class="card" autocomplete="on">
-      <label for="l-tel">Teléfono móvil</label>
-      <input id="l-tel" type="tel" inputmode="tel" placeholder="600 000 000" required autocomplete="tel">
-      <label for="l-pin">PIN</label>
-      <input id="l-pin" type="password" inputmode="numeric" placeholder="••••" required autocomplete="current-password">
-      <div id="l-err" class="error hidden"></div>
-      <div style="height:14px"></div>
-      <button class="btn" type="submit">Entrar</button>
-    </form>
-    <p class="center muted">Consejo: entra <b>antes del día de la votación</b> para comprobar que tienes acceso.</p>
-  </section>
-
   <!-- INICIO -->
   <section id="s-home" class="screen">
     <div class="topbar">
       <div class="title"><span id="h-eleccion" class="badge">Elecciones</span></div>
-      <button class="btn ghost small" id="b-logout">Salir</button>
     </div>
-    <h1>Hola, <span id="h-nombre"></span></h1>
+    <h1>Recuento de actas</h1>
+    <div class="card">
+      <label for="h-nombre" style="margin-top:0">Tu nombre <span class="muted">(opcional, para saber quién envía cada acta)</span></label>
+      <input id="h-nombre" placeholder="Nombre y apellido" autocomplete="name">
+    </div>
 
     <div id="h-pend" class="warn hidden">
       <b><span id="h-pend-n">0</span> acta(s) pendiente(s) de enviar.</b><br>

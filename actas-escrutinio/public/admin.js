@@ -109,12 +109,12 @@ function pintarActas(L) {
   const q = norm($('f-q').value);
   const soloInc = $('f-inc').checked;
   const filas = L.filter((a) => (!soloInc || (a.incidencia && !a.revisada)) &&
-    (!q || norm([a.municipio, a.distrito, a.seccion, a.mesa, a.enviadoPor?.nombre, a.enviadoPor?.telefono].join(' ')).includes(q)));
+    (!q || norm([a.municipio, a.distrito, a.seccion, a.mesa, a.enviadoPor?.nombre].join(' ')).includes(q)));
   $('t-act').innerHTML = `<thead><tr><th>Estado</th><th>Municipio</th><th>Dist.</th><th>Secc.</th><th>Mesa</th><th class="n">Votantes</th><th>Avisos</th><th>Apoderado</th><th>Hora</th></tr></thead><tbody>` +
     filas.map((a) => `<tr data-id="${esc(a.id)}"><td>${a.revisada ? '<span class="pill ok">Revisada</span>' : a.incidencia ? '<span class="pill bad">Incidencia</span>' : '<span class="pill ok">OK</span>'}</td>
       <td>${esc(a.municipio)}</td><td>${esc(a.distrito)}</td><td>${esc(a.seccion)}</td><td>${esc(a.mesa)}</td><td class="n">${fmt(a.votantes)}</td>
       <td style="white-space:normal;min-width:180px">${esc((a.avisos || []).join(' · '))}${a.foto ? '' : ' <span class="pill wait">Sin foto</span>'}</td>
-      <td>${esc(a.enviadoPor?.nombre)}<br><span class="muted">${esc(a.enviadoPor?.telefono)}</span></td>
+      <td>${esc(a.enviadoPor?.nombre || 'Sin nombre')}</td>
       <td>${new Date(a.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</td></tr>`).join('') +
     (filas.length ? '' : '<tr><td colspan="9" class="muted">No hay actas.</td></tr>') + '</tbody>';
   $('t-act').querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => verActa(tr.dataset.id)));
@@ -139,7 +139,7 @@ async function verActa(id) {
         ${(a.avisos || []).length ? `<p class="warn" style="margin-top:10px">${a.avisos.map(esc).join('<br>')}</p>` : ''}
         ${a.observaciones ? `<p><b>Observaciones:</b> ${esc(a.observaciones)}</p>` : ''}
         ${tablaVotos(a, P)}
-        <p class="muted">Enviada por ${esc(a.enviadoPor?.nombre)} (${esc(a.enviadoPor?.telefono)}) · ${new Date(a.recibido).toLocaleString('es-ES')}</p>
+        <p class="muted">Enviada por ${esc(a.enviadoPor?.nombre || 'Sin nombre')} · ${new Date(a.recibido).toLocaleString('es-ES')}</p>
         ${(a.historial || []).length ? `<details><summary><b>${a.historial.length} versión(es) anterior(es)</b></summary>${a.historial.map((h) => `<div class="card" style="background:#f6f8fb"><div class="muted">${esc(h.enviadoPor?.nombre)} · ${new Date(h.recibido).toLocaleString('es-ES')}</div>${tablaVotos(h, P)}</div>`).join('')}</details>` : ''}
         <div style="height:10px"></div>
         <button class="btn ${a.revisada ? 'secondary' : ''}" id="m-rev">${a.revisada ? 'Quitar marca de revisada' : '✓ Marcar como revisada'}</button>
@@ -159,7 +159,6 @@ async function cargarConfig() {
   const c = await api('/api/admin/config');
   $('c-eleccion').value = c.config.eleccion;
   $('c-partidos').value = c.config.partidos.map((p) => `${p.nombre};${p.color}` + (p.orden && Object.keys(p.orden).length ? ';' + Object.entries(p.orden).map(([k, v]) => k + ':' + v).join(',') : '')).join('\n');
-  $('c-nap').textContent = `(${c.apoderados.length} dados de alta)`;
   $('c-nmesas').textContent = c.mesas ? `(${fmt(c.mesas)} mesas cargadas)` : '(no cargado)';
 }
 $('b-conf').addEventListener('click', async () => {
@@ -184,7 +183,6 @@ async function subirCSV(fileId, url, msgId, extra = {}) {
     cargarConfig(); refrescar();
   } catch (e) { $(msgId).textContent = '⚠ ' + e.message + (e.data?.errores?.length ? ' — ' + e.data.errores.slice(0, 3).join('; ') : ''); }
 }
-$('b-ap').addEventListener('click', () => subirCSV('c-ap-file', '/api/admin/apoderados', 'c-ap-msg', { anadir: $('c-ap-add').checked }));
 $('b-mesas').addEventListener('click', () => subirCSV('c-mesas-file', '/api/admin/mesas', 'c-mesas-msg'));
 
 // ---------- arranque ----------

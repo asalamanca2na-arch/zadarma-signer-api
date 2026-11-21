@@ -64,12 +64,10 @@ const DEFAULT_CONFIG = {
 // Una candidatura se presenta en una provincia si no tiene "orden" (= en todas) o si tiene número para esa provincia.
 const sePresenta = (p, prov) => !p.orden || !Object.keys(p.orden).length || p.orden[prov] != null;
 const configFile = path.join(DATA_DIR, 'config.json');
-const apoderadosFile = path.join(DATA_DIR, 'apoderados.json');
 const mesasFile = path.join(DATA_DIR, 'mesas.json');
 
 let config = readJSON(configFile, null);
 if (!config) { config = DEFAULT_CONFIG; writeJSON(configFile, config); }
-let apoderados = readJSON(apoderadosFile, []);
 let mesas = readJSON(mesasFile, []);
 let mesasIndex = new Map();
 function indexarMesas() { mesasIndex = new Map(mesas.map((x) => [mesaKey(x), x])); }
@@ -173,6 +171,17 @@ function rateLimited(key) {
   e.n++;
   intentos.set(key, e);
   return e.n > 15;
+}
+
+// Límite generoso de envíos por IP (los móviles de una misma operadora pueden compartir IP).
+const envios = new Map();
+function rateLimitedEnvios(ip) {
+  const now = Date.now();
+  const e = envios.get(ip) || { n: 0, t: now };
+  if (now - e.t > 10 * 60 * 1000) { e.n = 0; e.t = now; }
+  e.n++;
+  envios.set(ip, e);
+  return e.n > 300;
 }
 
 // ---------- HTTP helpers ----------
@@ -294,7 +303,7 @@ function guardarActa(body, user) {
     id, ...ubic, ...datos,
     observaciones: String(body.observaciones || '').slice(0, 2000).trim(),
     foto: foto || previa?.foto || null,
-    enviadoPor: { telefono: user.tel, nombre: user.nombre },
+    enviadoPor: { nombre: user.nombre, dispositivo: user.dispositivo },
     recibido: new Date().toISOString(),
     clientId: body.clientId || null,
     revisada: false,
@@ -363,19 +372,6 @@ async function handle(req, res) {
 
   const auth = verify(getToken(req, url));
   const isAdmin = auth?.rol === 'admin';
-  const isApoderado = auth?.rol === 'apoderado' && apoderados.some((a) => a.telefono === auth.tel);
-
-  // --- públicas ---
-  if (m === 'POST' && p === '/api/login') {
-    if (rateLimited('l:' + clientIp(req))) return send(res, 429, { error: 'Demasiados intentos. Espera unos minutos.' });
-    const b = await readBody(req);
-    const tel = normTelefono(b.telefono);
-    const ap = apoderados.find((a) => a.telefono === tel);
-    if (!ap) return send(res, 403, { error: 'Acceso denegado: este teléfono no está dado de alta.', codigo: 'no_alta' });
-    if (!safeEqual(ap.pin, String(b.pin || '').trim())) return send(res, 401, { error: 'PIN incorrecto.' });
-    const token = sign({ rol: 'apoderado', tel, nombre: ap.nombre, exp: Date.now() + 1000 * 60 * 60 * 24 * 30 });
-    return send(res, 200, { token, nombre: ap.nombre, telefono: tel });
-  }
   if (m === 'POST' && p === '/api/admin/login') {
     if (rateLimited('a:' + clientIp(req))) return send(res, 429, { error: 'Demasiados intentos. Espera unos minutos.' });
     const b = await readBody(req);
@@ -383,27 +379,26 @@ async function handle(req, res) {
     return send(res, 200, { token: sign({ rol: 'admin', exp: Date.now() + 1000 * 60 * 60 * 24 * 3 }) });
   }
 
-  // --- apoderados ---
+  // --- app abierta: no hace falta iniciar sesión ---
+  const dispositivo = String(req.headers['x-dispositivo'] || '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 64);
   if (p === '/api/config' && m === 'GET') {
-    if (!isApoderado && !isAdmin) return send(res, 401, { error: 'Sesión caducada', codigo: 'auth' });
     return send(res, 200, { eleccion: config.eleccion, partidos: config.partidos, provincias: PROVINCIAS, municipios: municipiosConfig(), hayListadoMesas: mesas.length > 0 });
   }
   if (p === '/api/mesas' && m === 'GET') {
-    if (!isApoderado && !isAdmin) return send(res, 401, { error: 'Sesión caducada', codigo: 'auth' });
     const prov = norm(url.searchParams.get('provincia')), mun = norm(url.searchParams.get('municipio'));
     return send(res, 200, mesas.filter((x) => norm(x.provincia) === prov && norm(x.municipio) === mun)
       .map((x) => ({ distrito: padNum(x.distrito, 2), seccion: padNum(x.seccion, 3), mesa: String(x.mesa).toUpperCase(), electores: toInt(x.electores) })));
   }
   if (p === '/api/actas' && m === 'POST') {
-    if (!isApoderado) return send(res, 401, { error: 'Sesión caducada', codigo: 'auth' });
+    if (rateLimitedEnvios(clientIp(req))) return send(res, 429, { error: 'Demasiados envíos seguidos. Espera unos minutos.' });
     const b = await readBody(req);
-    const a = guardarActa(b, auth);
+    const a = guardarActa(b, { nombre: String(b.nombre || '').trim().slice(0, 80), dispositivo });
     return send(res, 200, { ok: true, acta: resumenActa(a) });
   }
   if (p === '/api/mis-actas' && m === 'GET') {
-    if (!isApoderado) return send(res, 401, { error: 'Sesión caducada', codigo: 'auth' });
-    return send(res, 200, [...actas.values()].filter((a) => a.enviadoPor?.telefono === auth.tel ||
-      (a.historial || []).some((h) => h.enviadoPor?.telefono === auth.tel)).map(resumenActa));
+    if (!dispositivo) return send(res, 200, []);
+    return send(res, 200, [...actas.values()].filter((a) => a.enviadoPor?.dispositivo === dispositivo ||
+      (a.historial || []).some((h) => h.enviadoPor?.dispositivo === dispositivo)).map(resumenActa));
   }
 
   // --- administración ---
@@ -434,17 +429,17 @@ async function handle(req, res) {
       return fs.createReadStream(file).pipe(res);
     }
     if (p === '/api/admin/export.csv' && m === 'GET') {
-      const cols = ['provincia', 'municipio', 'distrito', 'seccion', 'mesa', 'censo', 'votantes', 'nulos', 'blancos', ...config.partidos.map((x) => x.nombre), 'cuadra', 'avisos', 'observaciones', 'enviado_por', 'telefono', 'recibido'];
+      const cols = ['provincia', 'municipio', 'distrito', 'seccion', 'mesa', 'censo', 'votantes', 'nulos', 'blancos', ...config.partidos.map((x) => x.nombre), 'cuadra', 'avisos', 'observaciones', 'enviado_por', 'dispositivo', 'recibido'];
       const lines = [cols.map(csvCell).join(';')];
       for (const a of [...actas.values()].sort((x, y) => x.id.localeCompare(y.id))) {
         lines.push([a.provincia, a.municipio, a.distrito, a.seccion, a.mesa, a.censo, a.votantes, a.nulos, a.blancos,
           ...config.partidos.map((x) => a.votos[x.id] ?? 0), a.cuadra ? 'SI' : 'NO', a.avisos.join(' | '), a.observaciones,
-          a.enviadoPor?.nombre, a.enviadoPor?.telefono, a.recibido].map(csvCell).join(';'));
+          a.enviadoPor?.nombre, a.enviadoPor?.dispositivo?.slice(0, 8), a.recibido].map(csvCell).join(';'));
       }
       return send(res, 200, '﻿' + lines.join('\r\n'), { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="actas.csv"' });
     }
     if (p === '/api/admin/config' && m === 'GET') {
-      return send(res, 200, { config, apoderados: apoderados.map(({ pin, ...r }) => ({ ...r, pin: '••••' })), mesas: mesas.length });
+      return send(res, 200, { config, mesas: mesas.length });
     }
     if (p === '/api/admin/config' && m === 'PUT') {
       const b = await readBody(req);
@@ -458,21 +453,6 @@ async function handle(req, res) {
       config = { eleccion: String(b.eleccion || config.eleccion).trim(), partidos };
       writeJSON(configFile, config);
       return send(res, 200, { ok: true, config });
-    }
-    if (p === '/api/admin/apoderados' && m === 'PUT') {
-      const b = await readBody(req);
-      const filas = parseCSV(b.csv);
-      const nuevos = []; const errores = [];
-      filas.forEach((r, i) => {
-        const tel = normTelefono(r.telefono || r.telefon || r.movil || r.mobil);
-        const pin = String(r.pin || r.codigo || r.codi || '').trim();
-        if (tel.length < 9 || !pin) { errores.push(`Fila ${i + 2}: falta teléfono o PIN`); return; }
-        nuevos.push({ telefono: tel, nombre: r.nombre || r.nom || '', pin });
-      });
-      if (!nuevos.length) return send(res, 400, { error: 'No se ha leído ningún apoderado. Columnas: telefono;nombre;pin', errores });
-      apoderados = b.anadir ? [...apoderados.filter((a) => !nuevos.some((n) => n.telefono === a.telefono)), ...nuevos] : nuevos;
-      writeJSON(apoderadosFile, apoderados);
-      return send(res, 200, { ok: true, total: apoderados.length, errores });
     }
     if (p === '/api/admin/mesas' && m === 'PUT') {
       const b = await readBody(req);

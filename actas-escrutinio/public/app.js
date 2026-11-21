@@ -8,7 +8,9 @@ const store = {
   del(k) { try { localStorage.removeItem(k); } catch {} },
 };
 
-let sesion = store.get('sesion', null);
+// Identificador anónimo de este móvil, solo para mostrar «Mis actas enviadas».
+let dispositivo = store.get('dispositivo', null);
+if (!dispositivo) { dispositivo = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(16) + Math.random().toString(16).slice(2)); store.set('dispositivo', dispositivo); }
 let cfg = store.get('cfg', null);
 let borrador = null; // acta en curso
 let mesasMunicipio = [];
@@ -32,11 +34,10 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 async function api(path, opts = {}) {
   const res = await fetch(path, {
     method: opts.method || 'GET',
-    headers: { 'Content-Type': 'application/json', ...(sesion ? { Authorization: 'Bearer ' + sesion.token } : {}) },
+    headers: { 'Content-Type': 'application/json', 'X-Dispositivo': dispositivo },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && data.codigo === 'auth') { salir(); throw Object.assign(new Error('Sesión caducada. Vuelve a entrar.'), { status: 401 }); }
   if (!res.ok) throw Object.assign(new Error(data.error || 'Error ' + res.status), { status: res.status, data });
   return data;
 }
@@ -67,7 +68,7 @@ const DB = {
 
 let enviando = false;
 async function vaciarCola() {
-  if (enviando || !sesion) return;
+  if (enviando) return;
   enviando = true;
   try {
     for (const p of await DB.all()) {
@@ -76,7 +77,7 @@ async function vaciarCola() {
         await DB.del(p.clientId);
       } catch (e) {
         if (!e.status) break; // sin conexión: lo intentamos más tarde
-        if (e.status >= 400 && e.status < 500 && e.status !== 401 && e.status !== 429) { await DB.del(p.clientId); alert('Un acta pendiente tenía datos no válidos y se ha descartado: ' + e.message); }
+        if (e.status >= 400 && e.status < 500 && e.status !== 429) { await DB.del(p.clientId); alert('Un acta pendiente tenía datos no válidos y se ha descartado: ' + e.message); }
         else break;
       }
     }
@@ -85,26 +86,9 @@ async function vaciarCola() {
 window.addEventListener('online', vaciarCola);
 setInterval(vaciarCola, 30000);
 
-// ---------- login ----------
-$('f-login').addEventListener('submit', async (ev) => {
-  ev.preventDefault();
-  $('l-err').classList.add('hidden');
-  try {
-    sesion = await api('/api/login', { method: 'POST', body: { telefono: $('l-tel').value, pin: $('l-pin').value } });
-    store.set('sesion', sesion);
-    await cargarConfig();
-    await inicio();
-  } catch (e) {
-    $('l-err').textContent = e.status ? e.message : 'No hay conexión. Inténtalo cuando tengas cobertura.';
-    $('l-err').classList.remove('hidden');
-  }
-});
-function salir() { sesion = null; store.del('sesion'); show('s-login'); }
-$('b-logout').addEventListener('click', async () => {
-  const pend = (await DB.all()).length;
-  if (pend && !confirm(`Tienes ${pend} acta(s) sin enviar. Si sales no se enviarán hasta que vuelvas a entrar. ¿Salir?`)) return;
-  salir();
-});
+// ---------- nombre (opcional) ----------
+$('h-nombre').value = store.get('nombre', '');
+$('h-nombre').addEventListener('input', () => store.set('nombre', $('h-nombre').value.trim()));
 
 async function cargarConfig() {
   try { cfg = await api('/api/config'); store.set('cfg', cfg); } catch (e) { if (!cfg) throw e; }
@@ -112,8 +96,6 @@ async function cargarConfig() {
 
 // ---------- inicio ----------
 async function pintarInicio() {
-  if (!sesion) return;
-  $('h-nombre').textContent = sesion.nombre || '';
   $('h-eleccion').textContent = cfg?.eleccion || 'Elecciones';
   const pend = await DB.all().catch(() => []);
   $('h-pend').classList.toggle('hidden', !pend.length);
@@ -329,7 +311,7 @@ $('b-enviar').addEventListener('click', async () => {
   if (dif !== 0 && !confirm(`Los votos NO cuadran (${dif > 0 ? 'faltan ' + dif : 'sobran ' + -dif}).\n\nRevisa cada cifra con el acta. Si el acta está así, explícalo en Observaciones.\n\n¿Enviar igualmente?`)) return;
   if (!borrador.foto && !confirm('Vas a enviar el acta SIN foto. ¿Seguro?')) return;
 
-  const envio = { clientId: borrador.clientId, ubicacion: borrador.ubicacion, votos: v, observaciones: $('v-obs').value, foto: borrador.foto || null, creado: new Date().toISOString() };
+  const envio = { nombre: store.get('nombre', ''), clientId: borrador.clientId, ubicacion: borrador.ubicacion, votos: v, observaciones: $('v-obs').value, foto: borrador.foto || null, creado: new Date().toISOString() };
   modal('<div class="spinner"></div><p>Enviando acta…</p>', { cerrar: false });
   try {
     await api('/api/actas', { method: 'POST', body: envio });
@@ -354,8 +336,11 @@ $('b-enviar').addEventListener('click', async () => {
 // ---------- arranque ----------
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 (async () => {
-  if (!sesion) return show('s-login');
+  show('s-home');
   try { await cargarConfig(); } catch {}
-  if (!cfg) return show('s-login');
+  if (!cfg) {
+    modal('<div class="big">📶</div><h2 style="justify-content:center">Sin conexión</h2><p>La primera vez hace falta cobertura para abrir la app.</p><button class="btn" onclick="location.reload()">Reintentar</button>', { cerrar: false });
+    return;
+  }
   inicio();
 })();
