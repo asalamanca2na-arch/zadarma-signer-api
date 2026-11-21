@@ -40,27 +40,29 @@ if (!ADMIN_PASSWORD) {
 
 // ---------- configuración ----------
 const PROVINCIAS = ['Barcelona', 'Girona', 'Lleida', 'Tarragona'];
-// Elecciones generales 29-N-2026, Congreso. Candidaturas según la prensa (verificar con el BOE de proclamación).
-// "provincias" vacío = se presenta en las 4 circunscripciones catalanas.
+// Elecciones generales 29-N-2026, Congreso. Candidaturas proclamadas según el BOE-A-2026-23103.
+// "orden" = posición de la candidatura en el acta/papeleta de cada provincia (si no aparece, no se presenta allí).
 const DEFAULT_CONFIG = {
   eleccion: 'Generales 29-N 2026 · Congreso',
   partidos: [
-    { id: 'pp', nombre: 'PP', color: '#1d84ce', provincias: [] },
-    { id: 'psc', nombre: 'PSC', color: '#e30613', provincias: [] },
-    { id: 'junts', nombre: 'Junts', color: '#20c0b2', provincias: [] },
-    { id: 'erc', nombre: 'ERC', color: '#f4b400', provincias: [] },
-    { id: 'comuns', nombre: 'Comuns-Front Ampli', color: '#8a3f8f', provincias: [] },
-    { id: 'vox', nombre: 'VOX', color: '#63be21', provincias: [] },
-    { id: 'alhora', nombre: 'Alhora', color: '#f26522', provincias: [] },
-    { id: 'salf', nombre: 'SALF', color: '#6b4f2a', provincias: ['Barcelona'] },
-    { id: 'fo', nombre: 'FO', color: '#9e1b1b', provincias: ['Barcelona'] },
-    { id: 'pctc', nombre: 'PCTC', color: '#c00000', provincias: ['Barcelona'] },
-    { id: 'pacma', nombre: 'PACMA', color: '#2e9e57', provincias: ['Barcelona'] },
-    { id: 'd21', nombre: 'D21', color: '#5a6b7b', provincias: ['Barcelona'] },
-    { id: 'mundo-justo', nombre: 'Mundo+Justo', color: '#7a8a99', provincias: ['Barcelona'] },
-    { id: 'otros', nombre: 'Otras candidaturas', color: '#9aa5b1', provincias: [] },
+    { id: 'psc', nombre: 'PSC', color: '#e30613', orden: { Barcelona: 1, Girona: 1, Lleida: 1, Tarragona: 1 } },
+    { id: 'junts', nombre: 'Junts', color: '#20c0b2', orden: { Barcelona: 2, Girona: 3, Lleida: 2, Tarragona: 4 } },
+    { id: 'erc', nombre: 'ERC', color: '#f4b400', orden: { Barcelona: 3, Girona: 4, Lleida: 4, Tarragona: 2 } },
+    { id: 'pp', nombre: 'PP', color: '#1d84ce', orden: { Barcelona: 9, Girona: 10, Lleida: 9, Tarragona: 12 } },
+    { id: 'vox', nombre: 'VOX', color: '#63be21', orden: { Barcelona: 7, Girona: 8, Lleida: 7, Tarragona: 8 } },
+    { id: 'comuns', nombre: 'Comuns-Front Ampli', color: '#8a3f8f', orden: { Barcelona: 8, Girona: 5, Lleida: 5, Tarragona: 7 } },
+    { id: 'alhora', nombre: 'Alhora', color: '#f26522', orden: { Barcelona: 13, Girona: 9, Lleida: 10, Tarragona: 13 } },
+    { id: 'fo', nombre: 'Frente Obrero (FO)', color: '#9e1b1b', orden: { Barcelona: 4, Girona: 2, Lleida: 3, Tarragona: 3 } },
+    { id: 'salf', nombre: 'Se Acabó La Fiesta (SALF)', color: '#6b4f2a', orden: { Barcelona: 5, Tarragona: 6 } },
+    { id: 'pctc', nombre: 'PCTC', color: '#c00000', orden: { Barcelona: 6, Girona: 6, Lleida: 6, Tarragona: 5 } },
+    { id: 'pacma', nombre: 'PACMA', color: '#2e9e57', orden: { Barcelona: 12, Girona: 7, Lleida: 8, Tarragona: 9 } },
+    { id: 'mundo-justo', nombre: 'Por un Mundo más Justo', color: '#7a8a99', orden: { Barcelona: 10, Tarragona: 11 } },
+    { id: 'd21', nombre: 'Democracia S.21 (D21)', color: '#5a6b7b', orden: { Barcelona: 11 } },
+    { id: 'cnv', nombre: 'Convergents (CNV)', color: '#003f7f', orden: { Tarragona: 10 } },
   ],
 };
+// Una candidatura se presenta en una provincia si no tiene "orden" (= en todas) o si tiene número para esa provincia.
+const sePresenta = (p, prov) => !p.orden || !Object.keys(p.orden).length || p.orden[prov] != null;
 const configFile = path.join(DATA_DIR, 'config.json');
 const apoderadosFile = path.join(DATA_DIR, 'apoderados.json');
 const mesasFile = path.join(DATA_DIR, 'mesas.json');
@@ -267,7 +269,7 @@ function guardarActa(body, user) {
   const id = mesaKey(ubic);
   const v = body.votos || {};
   const votos = {};
-  for (const p of config.partidos) votos[p.id] = (p.provincias?.length && !p.provincias.includes(provincia)) ? 0 : (toInt(v.partidos?.[p.id]) ?? 0);
+  for (const p of config.partidos) votos[p.id] = !sePresenta(p, provincia) ? 0 : (toInt(v.partidos?.[p.id]) ?? 0);
   const datos = {
     censo: toInt(v.censo) ?? 0,
     votantes: toInt(v.votantes) ?? 0,
@@ -449,7 +451,7 @@ async function handle(req, res) {
       const partidos = (b.partidos || []).map((x) => ({
         id: String(x.id || x.nombre).trim().toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
         nombre: String(x.nombre || '').trim(), color: /^#[0-9a-f]{6}$/i.test(x.color) ? x.color : '#888888',
-        provincias: (Array.isArray(x.provincias) ? x.provincias : []).map((p) => PROVINCIAS.find((q) => norm(q) === norm(p))).filter(Boolean),
+        orden: Object.fromEntries(Object.entries(x.orden || {}).map(([p, n]) => [PROVINCIAS.find((q) => norm(q) === norm(p)), toInt(n) ?? 99]).filter(([p]) => p)),
       })).filter((x) => x.id && x.nombre);
       if (!partidos.length) return send(res, 400, { error: 'Hace falta al menos un partido' });
       if (new Set(partidos.map((x) => x.id)).size !== partidos.length) return send(res, 400, { error: 'Hay partidos repetidos' });

@@ -42,9 +42,8 @@ ADMIN_PASSWORD="una-contraseña-larga" npm start
 
 Después, en **Configuración**:
 
-1. Revisa las **candidaturas**. Vienen precargadas las del **Congreso, generales 29-N-2026** en Catalunya, sacadas de la prensa:
-   compruébalas con el BOE de proclamación y ponlas **en el mismo orden que el acta**. La fila «Otras candidaturas» recoge
-   cualquier partido que falte, para que el acta cuadre igualmente.
+1. Revisa las **candidaturas**. Vienen precargadas las del **Congreso, generales 29-N-2026**, tal como las proclamó el
+   BOE-A-2026-23103: en cada provincia salen solo las que se presentan allí y en el orden del acta.
 2. Carga los **apoderados** con un CSV `telefono;nombre;pin` (ver `ejemplos/apoderados.csv`).
 3. (Recomendado) Carga el **listado de mesas** con un CSV `provincia;municipio;distrito;seccion;mesa;electores`
    (ver `ejemplos/mesas.csv`). Se puede preparar a partir de los datos de mesas que publica la Junta Electoral / el Idescat.

@@ -261,8 +261,11 @@ $('b-ubic-ok').addEventListener('click', () => {
 });
 
 // ---------- paso 2: votos ----------
-// Candidaturas que se presentan en esa provincia (sin "provincias" = en todas).
-const partidosDe = (prov) => cfg.partidos.filter((p) => !p.provincias?.length || p.provincias.includes(prov));
+// Candidaturas que se presentan en esa provincia (sin "orden" = en todas)
+// ...y en el mismo orden que el acta de esa provincia.
+const partidosDe = (prov) => cfg.partidos
+  .filter((p) => !p.orden || !Object.keys(p.orden).length || p.orden[prov] != null)
+  .map((p, i) => ({ p, k: p.orden?.[prov] ?? 1000 + i })).sort((a, b) => a.k - b.k).map((x) => x.p);
 const numIds = ['v-censo', 'v-votantes', 'v-nulos', 'v-blancos'];
 function irVotos() {
   const u = borrador.ubicacion;
@@ -273,7 +276,7 @@ function irVotos() {
   const v = borrador.votos || {};
   const hecho = u.provincia + JSON.stringify(cfg.partidos);
   if ($('v-partidos').dataset.hecho !== hecho) {
-    $('v-partidos').innerHTML = partidosDe(u.provincia).map((p) => `<div><label for="p-${esc(p.id)}" class="party"><span class="dot" style="background:${esc(p.color)}"></span>${esc(p.nombre)}</label><input id="p-${esc(p.id)}" data-partido="${esc(p.id)}" inputmode="numeric" pattern="[0-9]*"></div>`).join('');
+    $('v-partidos').innerHTML = partidosDe(u.provincia).map((p) => `<div><label for="p-${esc(p.id)}" class="party"><span class="dot" style="background:${esc(p.color)}"></span>${p.orden?.[u.provincia] ? p.orden[u.provincia] + '. ' : ''}${esc(p.nombre)}</label><input id="p-${esc(p.id)}" data-partido="${esc(p.id)}" inputmode="numeric" pattern="[0-9]*"></div>`).join('');
     $('v-partidos').dataset.hecho = hecho;
     $('v-partidos').querySelectorAll('input').forEach((i) => i.addEventListener('input', recalcular));
   }
