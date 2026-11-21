@@ -11,7 +11,9 @@ y el equipo vea los resultados en tiempo real y las mesas con incidencias.
 
 1. Abre el enlace: **no hace falta iniciar sesión**.
 2. **Saca la foto del acta** (o la sube desde la galería, o la introduce sin foto).
-3. **Paso 1 · Tus datos y mesa**: **nombre y apellido** y **colegio electoral** (obligatorios; el móvil los recuerda), y provincia, municipio, distrito, sección y mesa. Si se ha cargado el listado
+3. **Paso 1 · Tus datos y mesa**: **nombre y apellido** y **colegio electoral** (obligatorios; el móvil los recuerda), y la mesa con
+   desplegables en cascada **provincia → municipio → distrito → sección → mesa**, cargados con los 947 municipios y las
+   5.143 secciones censales oficiales del INE (2025). Si una sección no aparece, se puede escribir a mano. Antes era: provincia, municipio, distrito, sección y mesa. Si se ha cargado el listado
    de mesas, la elige de una lista. Recuerda la última mesa usada.
 4. **Paso 2 · Votos**: censo, votantes, nulos, blancos y votos de cada candidatura.
    Un aviso **verde** indica que los votos cuadran (`candidaturas + blancos + nulos = votantes`)

@@ -13,7 +13,6 @@ let dispositivo = store.get('dispositivo', null);
 if (!dispositivo) { dispositivo = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(16) + Math.random().toString(16).slice(2)); store.set('dispositivo', dispositivo); }
 let cfg = store.get('cfg', null);
 let borrador = null; // acta en curso
-let mesasMunicipio = [];
 
 // ---------- navegación ----------
 function show(id) {
@@ -173,78 +172,69 @@ async function asegurarConfig() {
 async function irUbicacion() {
   if (!(await asegurarConfig())) return;
   const ult = store.get('ultima-mesa', {});
-  const sel = $('u-prov');
-  sel.innerHTML = '<option value="">Elige…</option>' + (cfg?.provincias || ['Barcelona', 'Girona', 'Lleida', 'Tarragona']).map((p) => `<option>${esc(p)}</option>`).join('');
-  sel.value = ult.provincia || '';
-  $('u-mun').value = ult.municipio || '';
-  $('u-dist').value = ult.distrito || '';
-  $('u-secc').value = ult.seccion || '';
-  $('u-mesa').value = ult.mesa || 'U';
+  $('u-prov').innerHTML = '<option value="">Elige…</option>' + cfg.provincias.map((p) => `<option>${esc(p)}</option>`).join('');
+  modoManual(false);
+  // Rellenamos en cascada con la última mesa usada en este móvil.
+  $('u-prov').value = ult.provincia || '';
+  alCambiarProv();
+  if (ult.municipio) { $('u-mun').value = ult.municipio; alCambiarMun(); }
+  if (ult.distrito && [...$('u-dist').options].some((o) => o.value === ult.distrito)) { $('u-dist').value = ult.distrito; alCambiarDist(); }
+  if (ult.seccion && [...$('u-secc').options].some((o) => o.value === ult.seccion)) { $('u-secc').value = ult.seccion; alCambiarSecc(); }
+  if (ult.mesa && [...$('u-mesa').options].some((o) => o.value === ult.mesa)) $('u-mesa').value = ult.mesa;
   $('u-err').classList.add('hidden');
-  rellenarMunicipios();
-  mesasCargadas = null; mesasMunicipio = [];
-  cargarMesas(ult);
   $('u-nombre').value = store.get('nombre', '');
   $('u-colegio').value = store.get('colegio', '');
   show('s-ubic');
 }
 $('b-ubic-back').addEventListener('click', () => show(borrador?.foto ? 's-foto' : 's-home'));
-// Reconoce el municipio aunque falten acentos o el artículo, o esté a medias si solo hay uno posible
-// («hospitalet» → «L'Hospitalet de Llobregat», «bisbal d'emporda» → «La Bisbal d'Empordà»).
-const claveMun = (s) => String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  .replace(/^(el|la|els|les|es|sa|ses) |^(l|s)['’]/, '').replace(/['’`.,·-]/g, '').replace(/\s+/g, ' ').trim();
-function municipioOficial(prov, txt) {
-  const k = claveMun(txt);
-  if (k.length < 2) return null;
-  const lista = cfg?.municipios?.[prov] || [];
-  const exacto = lista.find((m) => claveMun(m) === k);
-  if (exacto) return exacto;
-  const empiezan = lista.filter((m) => claveMun(m).startsWith(k));
-  return empiezan.length === 1 ? empiezan[0] : null;
-}
-function rellenarMunicipios() {
-  const lista = cfg?.municipios?.[$('u-prov').value] || [];
-  $('dl-mun').innerHTML = lista.map((m) => `<option value="${esc(m)}">`).join('');
-}
-$('u-prov').addEventListener('change', () => { rellenarMunicipios(); $('u-mun').value = ''; cargarMesas(); });
-$('u-mun').addEventListener('change', () => {
-  const o = municipioOficial($('u-prov').value, $('u-mun').value);
-  if (o) $('u-mun').value = o;
-  cargarMesas();
-});
 
-let mesasCargadas = null; // provincia|municipio de la lista mostrada
-async function cargarMesas(preferida) {
-  const prov = $('u-prov').value, mun = $('u-mun').value.trim();
-  const key = prov + '|' + mun.toLowerCase();
-  if (key === mesasCargadas && !preferida) return; // ya está cargada: no tocar la selección
-  mesasCargadas = key;
-  let lista = [];
-  if (cfg?.hayListadoMesas && prov && mun) {
-    try { lista = await api(`/api/mesas?provincia=${encodeURIComponent(prov)}&municipio=${encodeURIComponent(mun)}`); } catch {}
-  }
-  if (key !== mesasCargadas) return; // respuesta antigua: la ignoramos
-  mesasMunicipio = lista;
-  const hay = mesasMunicipio.length > 0;
-  $('u-mesa-sel').classList.toggle('hidden', !hay);
-  $('u-mesa-manual').classList.toggle('hidden', hay);
-  if (hay) {
-    $('u-mesa-list').innerHTML = '<option value="">Elige tu mesa…</option>' + mesasMunicipio.map((m, i) =>
-      `<option value="${i}">Distrito ${esc(m.distrito)} · Sección ${esc(m.seccion)} · Mesa ${esc(m.mesa)}</option>`).join('') +
-      '<option value="otra">Mi mesa no aparece…</option>';
-    if (preferida) {
-      const i = mesasMunicipio.findIndex((m) => m.distrito === preferida.distrito && m.seccion === preferida.seccion && m.mesa === preferida.mesa);
-      if (i >= 0) $('u-mesa-list').value = String(i);
-    }
-  }
+// ---- desplegables en cascada: provincia → municipio → distrito → sección → mesa ----
+function opciones(sel, valores, vacio, etiqueta = (v) => v) {
+  sel.innerHTML = `<option value="">${esc(vacio)}</option>` + valores.map((v) => `<option value="${esc(v)}">${esc(etiqueta(v))}</option>`).join('');
+  sel.disabled = valores.length === 0;
+  if (valores.length === 1) sel.value = valores[0];
 }
-$('u-mesa-list').addEventListener('change', () => {
-  if ($('u-mesa-list').value === 'otra') {
-    if (confirm('Si el acta pone esa mesa, no elijas otra: escríbela a mano. ¿Continuar?')) {
-      $('u-mesa-sel').classList.add('hidden'); $('u-mesa-manual').classList.remove('hidden'); mesasMunicipio = [];
-    } else $('u-mesa-list').value = '';
-  }
-});
+const seccionesDe = () => cfg.secciones?.[$('u-prov').value]?.[$('u-mun').value] || {};
+function alCambiarProv() {
+  const lista = cfg.municipios?.[$('u-prov').value] || [];
+  opciones($('u-mun'), lista, $('u-prov').value ? `Elige municipio (${lista.length})` : 'Elige primero la provincia');
+  alCambiarMun();
+}
+function alCambiarMun() {
+  const d = Object.keys(seccionesDe()).sort();
+  opciones($('u-dist'), d, $('u-mun').value ? 'Distrito' : '—', (v) => String(Number(v)));
+  alCambiarDist();
+}
+function alCambiarDist() {
+  const s = seccionesDe()[$('u-dist').value] || [];
+  opciones($('u-secc'), s, $('u-dist').value ? 'Sección' : '—', (v) => String(Number(v)));
+  alCambiarSecc();
+}
+function letrasMesa(prov, mun, dist, secc) {
+  return cfg.letras?.[[prov, mun, dist, secc].join('|')] || ['U', 'A', 'B', 'C', 'D', 'E'];
+}
+function alCambiarSecc() {
+  const listo = modo === 'manual' ? !!$('u-mun').value : !!$('u-secc').value;
+  const letras = listo ? letrasMesa($('u-prov').value, $('u-mun').value, $('u-dist').value, $('u-secc').value) : [];
+  opciones($('u-mesa'), letras, listo ? 'Mesa' : '—');
+}
+$('u-prov').addEventListener('change', alCambiarProv);
+$('u-mun').addEventListener('change', alCambiarMun);
+$('u-dist').addEventListener('change', alCambiarDist);
+$('u-secc').addEventListener('change', alCambiarSecc);
+
+// Por si el acta pone un distrito/sección que no está en el listado (secciones nuevas): escribirlo a mano.
+let modo = 'lista';
+function modoManual(on) {
+  modo = on ? 'manual' : 'lista';
+  $('u-manual').classList.toggle('hidden', !on);
+  $('u-dist').closest('div').classList.toggle('hidden', on);
+  $('u-secc').closest('div').classList.toggle('hidden', on);
+  $('b-manual').textContent = on ? '← Volver a elegir de la lista' : '¿No aparece tu distrito o sección?';
+  if (on) { $('u-dist-m').value = $('u-dist').value; $('u-secc-m').value = $('u-secc').value; }
+  alCambiarSecc();
+}
+$('b-manual').addEventListener('click', () => modoManual(modo !== 'manual'));
 
 $('b-ubic-ok').addEventListener('click', () => {
   const err = (t) => { $('u-err').textContent = t; $('u-err').classList.remove('hidden'); };
@@ -252,23 +242,15 @@ $('b-ubic-ok').addEventListener('click', () => {
   if (nombre.length < 3) return err('Escribe tu nombre y apellido.');
   if (colegio.length < 3) return err('Escribe el nombre del colegio electoral.');
   store.set('nombre', nombre); store.set('colegio', colegio);
-  const prov = $('u-prov').value;
+  const prov = $('u-prov').value, mun = $('u-mun').value;
   if (!prov) return err('Elige la provincia.');
-  if (!$('u-mun').value.trim()) return err('Escribe el municipio.');
-  const oficial = municipioOficial(prov, $('u-mun').value);
-  if (cfg?.municipios?.[prov]?.length && !oficial)
-    return err(`No encontramos «${$('u-mun').value.trim()}» en la provincia de ${prov}. Empieza a escribirlo y elige el nombre de la lista. ¿Es correcta la provincia?`);
-  if (oficial) $('u-mun').value = oficial;
-  const mun = $('u-mun').value.trim();
-  let u;
-  if (mesasMunicipio.length) {
-    const m = mesasMunicipio[Number($('u-mesa-list').value)];
-    if (!m || $('u-mesa-list').value === '') return err('Elige la mesa.');
-    u = { provincia: prov, municipio: mun, distrito: m.distrito, seccion: m.seccion, mesa: m.mesa, electores: m.electores };
-  } else {
-    u = { provincia: prov, municipio: mun, distrito: $('u-dist').value.trim(), seccion: $('u-secc').value.trim(), mesa: $('u-mesa').value };
-    if (!u.distrito || !u.seccion) return err('Completa distrito y sección.');
-  }
+  if (!mun) return err('Elige el municipio.');
+  const distrito = modo === 'manual' ? $('u-dist-m').value.trim() : $('u-dist').value;
+  const seccion = modo === 'manual' ? $('u-secc-m').value.trim() : $('u-secc').value;
+  if (!distrito) return err('Elige el distrito.');
+  if (!seccion) return err('Elige la sección.');
+  if (!$('u-mesa').value) return err('Elige la mesa.');
+  const u = { provincia: prov, municipio: mun, distrito: distrito.padStart(2, '0'), seccion: seccion.padStart(3, '0'), mesa: $('u-mesa').value };
   u.colegio = colegio;
   borrador.ubicacion = u; borrador.nombre = nombre;
   store.set('ultima-mesa', u);

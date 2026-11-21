@@ -81,17 +81,17 @@
       <label for="u-prov">Provincia</label>
       <select id="u-prov" required></select>
       <label for="u-mun">Municipio</label>
-      <input id="u-mun" list="dl-mun" required placeholder="Escribe el municipio" autocomplete="off">
-      <datalist id="dl-mun"></datalist>
-      <div id="u-mesa-sel" class="hidden">
-        <label for="u-mesa-list">Mesa</label>
-        <select id="u-mesa-list"></select>
+      <select id="u-mun" required disabled><option value="">Elige primero la provincia</option></select>
+      <div class="grid3">
+        <div><label for="u-dist">Distrito</label><select id="u-dist" required disabled></select></div>
+        <div><label for="u-secc">Sección</label><select id="u-secc" required disabled></select></div>
+        <div><label for="u-mesa">Mesa</label><select id="u-mesa" required disabled></select></div>
       </div>
-      <div id="u-mesa-manual" class="grid3">
-        <div><label for="u-dist">Distrito</label><input id="u-dist" inputmode="numeric" placeholder="01" required></div>
-        <div><label for="u-secc">Sección</label><input id="u-secc" inputmode="numeric" placeholder="001" required></div>
-        <div><label for="u-mesa">Mesa</label><select id="u-mesa" required><option>U</option><option>A</option><option>B</option><option>C</option></select></div>
+      <div id="u-manual" class="grid2 hidden">
+        <div><label for="u-dist-m">Distrito (a mano)</label><input id="u-dist-m" inputmode="numeric" placeholder="01"></div>
+        <div><label for="u-secc-m">Sección (a mano)</label><input id="u-secc-m" inputmode="numeric" placeholder="001"></div>
       </div>
+      <button type="button" class="btn ghost small" id="b-manual" style="margin-top:6px;padding-left:0">¿No aparece tu distrito o sección?</button>
       <div id="u-err" class="error hidden"></div>
     </form>
     <div class="footer-bar"><div class="inner"><button class="btn" id="b-ubic-ok">Siguiente →</button></div></div>

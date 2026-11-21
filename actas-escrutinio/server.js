@@ -248,6 +248,8 @@ function calcula(a) {
   const m = mesasIndex.get(a.id);
   if (m && toInt(m.electores) && a.censo && toInt(m.electores) !== a.censo) avisos.push(`Censo distinto al oficial (${m.electores})`);
   if (mesas.length && !m) avisos.push('Mesa no está en el listado');
+  const ds = SECCIONES[a.provincia]?.[a.municipio];
+  if (ds && !m && !(ds[a.distrito] || []).includes(a.seccion)) avisos.push('Distrito/sección no está en el listado del INE');
   if (Object.keys(MUNICIPIOS).length && !municipioOficial(a.provincia, a.municipio) && !m) avisos.push('Municipio no reconocido');
   if (a.conflicto) avisos.push('Hay otra versión distinta del acta');
   if (a.observaciones) avisos.push('Tiene observaciones');
@@ -380,6 +382,27 @@ const indiceMun = new Map();
 for (const [p, lista] of Object.entries(MUNICIPIOS)) for (const m of lista) indiceMun.set(p + '|' + claveMun(m), m);
 function municipioOficial(prov, nombre) { return indiceMun.get(prov + '|' + claveMun(nombre)) || null; }
 
+// Secciones censales oficiales de Catalunya (INE 2025): { provincia: { municipio: { distrito: [secciones] } } }.
+const SECCIONES = readJSON(path.join(__dirname, 'secciones.json'), {});
+// Secciones + letras de mesa: las del INE, ampliadas con el listado de mesas que se cargue desde el panel.
+function seccionesConfig() {
+  const secc = JSON.parse(JSON.stringify(SECCIONES));
+  const letras = {};
+  for (const m of mesas) {
+    const p = PROVINCIAS.find((x) => norm(x) === norm(m.provincia));
+    if (!p) continue;
+    const mun = municipioOficial(p, m.municipio) || m.municipio;
+    const d = padNum(m.distrito, 2), s = padNum(m.seccion, 3);
+    const lista = ((secc[p] ||= {})[mun] ||= {})[d] ||= [];
+    if (!lista.includes(s)) { lista.push(s); lista.sort(); }
+    const k = [p, mun, d, s].join('|');
+    (letras[k] ||= []).includes(m.mesa) || letras[k].push(m.mesa);
+  }
+  for (const k in letras) letras[k].sort((a, b) => (a === 'U' ? -1 : b === 'U' ? 1 : a.localeCompare(b)));
+  return { secciones: secc, letras };
+}
+let cacheSecc = null;
+
 function municipiosConfig() {
   const out = {};
   for (const p of PROVINCIAS) out[p] = [...(MUNICIPIOS[p] || [])];
@@ -411,7 +434,8 @@ async function handle(req, res) {
   // --- app abierta: no hace falta iniciar sesión ---
   const dispositivo = String(req.headers['x-dispositivo'] || '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 64);
   if (p === '/api/config' && m === 'GET') {
-    return send(res, 200, { eleccion: config.eleccion, partidos: config.partidos, provincias: PROVINCIAS, municipios: municipiosConfig(), hayListadoMesas: mesas.length > 0 });
+    cacheSecc ||= seccionesConfig();
+    return send(res, 200, { eleccion: config.eleccion, partidos: config.partidos, provincias: PROVINCIAS, municipios: municipiosConfig(), ...cacheSecc, hayListadoMesas: mesas.length > 0 });
   }
   if (p === '/api/mesas' && m === 'GET') {
     const prov = norm(url.searchParams.get('provincia')), mun = norm(url.searchParams.get('municipio'));
@@ -512,6 +536,7 @@ async function handle(req, res) {
       mesas = nuevas;
       writeJSON(mesasFile, mesas);
       indexarMesas();
+      cacheSecc = null;
       for (const a of actas.values()) calcula(a);
       return send(res, 200, { ok: true, total: mesas.length, errores: errores.slice(0, 50) });
     }
