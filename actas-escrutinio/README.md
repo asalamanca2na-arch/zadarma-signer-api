@@ -20,7 +20,7 @@ La app recoge las **dos actas** de cada mesa. En el paso 1 el apoderado elige **
 El panel tiene un selector **Congreso / Senado** que cambia resultados, actas y exportación CSV.
 
 Las letras de mesa (U, A, B…) y el % escrutado salen del listado oficial de **8.923 mesas** de Catalunya de las
-Generales 2023 (Ministerio del Interior). Si la letra del acta no aparece, se puede elegir «Otra…».
+Generales 2023 (Ministerio del Interior). Si la mesa del acta no aparece (o ha cambiado desde 2023), se puede escribir a mano: solo la letra («✏️ Escribir…» en el desplegable) o distrito, sección y mesa («¿No aparece tu distrito, sección o mesa?»).
 
 ## Cómo funciona (apoderado)
 

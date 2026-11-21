@@ -181,6 +181,7 @@ async function irUbicacion() {
   if (ult.distrito && [...$('u-dist').options].some((o) => o.value === ult.distrito)) { $('u-dist').value = ult.distrito; alCambiarDist(); }
   if (ult.seccion && [...$('u-secc').options].some((o) => o.value === ult.seccion)) { $('u-secc').value = ult.seccion; alCambiarSecc(); }
   if (ult.mesa && [...$('u-mesa').options].some((o) => o.value === ult.mesa)) $('u-mesa').value = ult.mesa;
+  else if (ult.mesa && $('u-secc').value === ult.seccion) { mesaEscrita(true); $('u-mesa-m').value = ult.mesa; $('u-mesa-m').blur(); }
   $('u-err').classList.add('hidden');
   marcarTipo();
   $('u-nombre').value = store.get('nombre', '');
@@ -224,12 +225,21 @@ function alCambiarSecc() {
   const letras = !listo ? [] : modo === 'manual' ? TODAS_LETRAS : letrasMesa($('u-prov').value, $('u-mun').value, $('u-dist').value, $('u-secc').value);
   opciones($('u-mesa'), letras, listo ? 'Mesa' : '—');
   // Las mesas oficiales son de 2023: si la del acta no aparece, se puede elegir otra letra.
-  if (listo && modo !== 'manual' && letras.length < TODAS_LETRAS.length) $('u-mesa').insertAdjacentHTML('beforeend', '<option value="__otra">Otra…</option>');
+  // Las mesas oficiales son de 2023: si la del acta no aparece, se puede escribir a mano.
+  if (listo && modo !== 'manual') $('u-mesa').insertAdjacentHTML('beforeend', '<option value="__escribir">✏️ Escribir…</option>');
+  mesaEscrita(false);
 }
-$('u-mesa').addEventListener('change', () => {
-  if ($('u-mesa').value !== '__otra') return;
-  opciones($('u-mesa'), TODAS_LETRAS, 'Mesa');
-});
+// Solo la mesa escrita a mano (distrito y sección siguen siendo de la lista).
+let mesaAMano = false;
+function mesaEscrita(on) {
+  mesaAMano = on;
+  const manual = on || modo === 'manual';
+  $('u-mesa').classList.toggle('hidden', manual);
+  $('u-mesa-m').classList.toggle('hidden', !manual);
+  if (on) { $('u-mesa-m').value = ''; $('u-mesa-m').focus(); }
+}
+$('u-mesa').addEventListener('change', () => { if ($('u-mesa').value === '__escribir') mesaEscrita(true); });
+$('u-mesa-m').addEventListener('input', () => { $('u-mesa-m').value = $('u-mesa-m').value.toUpperCase().replace(/[^A-Z]/g, ''); });
 $('u-prov').addEventListener('change', alCambiarProv);
 $('u-mun').addEventListener('change', alCambiarMun);
 $('u-dist').addEventListener('change', alCambiarDist);
@@ -239,12 +249,14 @@ $('u-secc').addEventListener('change', alCambiarSecc);
 let modo = 'lista';
 function modoManual(on) {
   modo = on ? 'manual' : 'lista';
-  $('u-manual').classList.toggle('hidden', !on);
-  $('u-dist').closest('div').classList.toggle('hidden', on);
-  $('u-secc').closest('div').classList.toggle('hidden', on);
-  $('b-manual').textContent = on ? '← Volver a elegir de la lista' : '¿No aparece tu distrito o sección?';
-  if (on) { $('u-dist-m').value = $('u-dist').value; $('u-secc-m').value = $('u-secc').value; }
+  for (const id of ['u-dist', 'u-secc']) { $(id).classList.toggle('hidden', on); $(id + '-m').classList.toggle('hidden', !on); }
+  $('b-manual').textContent = on ? '← Volver a elegir de la lista' : '✏️ ¿No aparece tu distrito, sección o mesa? Escríbelos a mano';
+  if (on) {
+    $('u-dist-m').value = $('u-dist').value; $('u-secc-m').value = $('u-secc').value;
+    const m = $('u-mesa').value; $('u-mesa-m').value = m && !m.startsWith('__') ? m : '';
+  }
   alCambiarSecc();
+  if (on) $('u-dist-m').focus();
 }
 $('b-manual').addEventListener('click', () => modoManual(modo !== 'manual'));
 
@@ -262,8 +274,11 @@ $('b-ubic-ok').addEventListener('click', () => {
   const seccion = modo === 'manual' ? $('u-secc-m').value.trim() : $('u-secc').value;
   if (!distrito) return err('Elige el distrito.');
   if (!seccion) return err('Elige la sección.');
-  if (!$('u-mesa').value || $('u-mesa').value === '__otra') return err('Elige la mesa.');
-  const u = { provincia: prov, municipio: mun, distrito: distrito.padStart(2, '0'), seccion: seccion.padStart(3, '0'), mesa: $('u-mesa').value };
+  const escrita = modo === 'manual' || mesaAMano;
+  const mesa = escrita ? $('u-mesa-m').value.trim().toUpperCase() : $('u-mesa').value;
+  if (!mesa || mesa.startsWith('__')) return err(escrita ? 'Escribe la letra de la mesa (U, A, B…).' : 'Elige la mesa.');
+  if (!/^[A-Z]{1,2}$/.test(mesa)) return err('La mesa es una letra: U, A, B, C…');
+  const u = { provincia: prov, municipio: mun, distrito: distrito.padStart(2, '0'), seccion: seccion.padStart(3, '0'), mesa };
   u.colegio = colegio;
   borrador.ubicacion = u; borrador.nombre = nombre;
   store.set('ultima-mesa', u);
