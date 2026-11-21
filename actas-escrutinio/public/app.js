@@ -137,7 +137,7 @@ function cargarImagen(file) {
 }
 // Reduce la foto a ~1800px y JPEG para que suba rápido incluso con poca cobertura.
 function comprimir(img, rot) {
-  const MAX = 1800;
+  const MAX = 2000;
   const s = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
   const w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s);
   const c = document.createElement('canvas');
@@ -146,15 +146,58 @@ function comprimir(img, rot) {
   const ctx = c.getContext('2d');
   ctx.translate(c.width / 2, c.height / 2); ctx.rotate((rot * Math.PI) / 180);
   ctx.drawImage(img, -w / 2, -h / 2, w, h);
-  return c.toDataURL('image/jpeg', 0.72);
+  return c.toDataURL('image/jpeg', 0.8);
 }
 $('b-rotar').addEventListener('click', () => {
   borrador.rot = (borrador.rot + 90) % 360;
   borrador.foto = comprimir(borrador.imagen, borrador.rot);
   $('f-img').src = borrador.foto;
 });
-$('b-foto-ok').addEventListener('click', irUbicacion);
+$('b-foto-ok').addEventListener('click', leerYContinuar);
 
+// ---------- lectura automática del acta (IA) ----------
+// Envía la foto al servidor, que la lee y devuelve los datos. El apoderado solo tiene que revisarlos.
+async function leerYContinuar() {
+  borrador.lectura = null;
+  if (cfg?.lecturaAutomatica && borrador.foto && navigator.onLine !== false) {
+    modal('<div class="spinner"></div><h2 style="justify-content:center">Leyendo el acta…</h2><p>Puede tardar unos segundos.</p><button class="btn secondary" id="b-leer-cancelar">Rellenar a mano</button>', { cerrar: false });
+    let cancelado = false;
+    $('b-leer-cancelar').onclick = () => { cancelado = true; cerrarModal(); irUbicacion(); };
+    try {
+      const r = await api('/api/leer-acta', { method: 'POST', body: { foto: borrador.foto } });
+      if (cancelado) return;
+      cerrarModal();
+      if (!r.lectura.esActa) {
+        modal('<div class="big">🤔</div><h2 style="justify-content:center">La foto no parece un acta</h2><p>Revisa que se vea el acta entera, o rellena los datos a mano.</p><button class="btn" id="b-repetir-foto">Repetir la foto</button><button class="btn secondary" data-close id="b-a-mano">Rellenar a mano</button>');
+        $('b-repetir-foto').onclick = () => { cerrarModal(); $('i-camara').click(); };
+        $('b-a-mano').onclick = () => { cerrarModal(); irUbicacion(); };
+        return;
+      }
+      aplicarLectura(r.lectura);
+    } catch (e) {
+      if (cancelado) return;
+      cerrarModal();
+      modal(`<div class="big">✍️</div><h2 style="justify-content:center">No se ha podido leer la foto</h2><p>${esc(e.status ? e.message : 'Sin conexión.')} Rellena los datos a mano; la foto se enviará igualmente.</p><button class="btn" data-close>Vale</button>`);
+    }
+  }
+  irUbicacion();
+}
+function aplicarLectura(l) {
+  borrador.lectura = l;
+  if (l.tipo) borrador.tipo = l.tipo;
+  if (l.tipo) {
+    borrador.votos = { tipo: l.tipo, censo: l.censo, votantes: l.votantes, nulos: l.nulos, blancos: l.blancos, partidos: l.votos, deLectura: true };
+  }
+}
+
+function avisoLectura(id, L, extra) {
+  const el = $(id);
+  if (!L) { el.classList.add('hidden'); return; }
+  el.innerHTML = `🤖 <b>Datos leídos de la foto.</b> Comprueba que coinciden con el acta antes de seguir.` +
+    (L.dudas ? `<br><small>⚠ ${esc(L.dudas)}</small>` : '') + (extra ? `<br><small>⚠ ${esc(extra)}</small>` : '');
+  el.classList.remove('hidden');
+}
+document.addEventListener('input', (e) => { if (e.target.classList?.contains('revisar') && e.target.value) e.target.classList.remove('revisar'); });
 function nuevoBorrador(foto) {
   borrador = { clientId: (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2)), foto, rot: 0 };
 }
@@ -171,7 +214,10 @@ async function asegurarConfig() {
 }
 async function irUbicacion() {
   if (!(await asegurarConfig())) return;
-  const ult = store.get('ultima-mesa', {});
+  const L = borrador.lectura;
+  const guardada = store.get('ultima-mesa', {});
+  // Prioridad: lo leído de la foto; si falta algo, la última mesa usada en este móvil.
+  const ult = L && L.provincia ? { provincia: L.provincia, municipio: L.municipio || '', distrito: L.distrito, seccion: L.seccion, mesa: L.mesa } : guardada;
   $('u-prov').innerHTML = '<option value="">Elige…</option>' + cfg.provincias.map((p) => `<option>${esc(p)}</option>`).join('');
   modoManual(false);
   // Rellenamos en cascada con la última mesa usada en este móvil.
@@ -180,8 +226,12 @@ async function irUbicacion() {
   if (ult.municipio) { $('u-mun').value = ult.municipio; alCambiarMun(); }
   if (ult.distrito && [...$('u-dist').options].some((o) => o.value === ult.distrito)) { $('u-dist').value = ult.distrito; alCambiarDist(); }
   if (ult.seccion && [...$('u-secc').options].some((o) => o.value === ult.seccion)) { $('u-secc').value = ult.seccion; alCambiarSecc(); }
-  if (ult.mesa && [...$('u-mesa').options].some((o) => o.value === ult.mesa)) $('u-mesa').value = ult.mesa;
+  // Si lo leído no está en la lista (sección nueva), se pasa a escribir a mano con los datos ya puestos.
+  if (L && ult.municipio && ult.distrito && ult.seccion && $('u-secc').value !== ult.seccion) {
+    modoManual(true); $('u-dist-m').value = ult.distrito; $('u-secc-m').value = ult.seccion; $('u-mesa-m').value = ult.mesa || ''; $('u-dist-m').blur();
+  } else if (ult.mesa && [...$('u-mesa').options].some((o) => o.value === ult.mesa)) $('u-mesa').value = ult.mesa;
   else if (ult.mesa && $('u-secc').value === ult.seccion) { mesaEscrita(true); $('u-mesa-m').value = ult.mesa; $('u-mesa-m').blur(); }
+  avisoLectura('u-ia', L, L && !L.municipio && L.municipioLeido ? `No hemos reconocido el municipio «${L.municipioLeido}»: elígelo de la lista.` : '');
   $('u-err').classList.add('hidden');
   marcarTipo();
   $('u-nombre').value = store.get('nombre', '');
@@ -206,12 +256,23 @@ function alCambiarProv() {
   opciones($('u-mun'), lista, $('u-prov').value ? `Elige municipio (${lista.length})` : 'Elige primero la provincia');
   alCambiarMun();
 }
+// Nombres de los distritos (los distritos censales de Barcelona coinciden con sus 10 distritos municipales).
+const DISTRITOS = { Barcelona: { '01': 'Ciutat Vella', '02': 'Eixample', '03': 'Sants-Montjuïc', '04': 'Les Corts', '05': 'Sarrià-Sant Gervasi', '06': 'Gràcia', '07': 'Horta-Guinardó', '08': 'Nou Barris', '09': 'Sant Andreu', '10': 'Sant Martí' } };
+const nombreDistrito = (mun, d) => String(Number(d)) + (DISTRITOS[mun]?.[d] ? ' · ' + DISTRITOS[mun][d] : '');
+function pintarNombreDistrito() {
+  const n = DISTRITOS[$('u-mun').value]?.[$('u-dist').value];
+  $('u-dist-nom').textContent = n ? 'Distrito ' + Number($('u-dist').value) + ': ' + n : '';
+  $('u-dist-nom').classList.toggle('hidden', !n);
+}
+$('u-dist').addEventListener('change', pintarNombreDistrito);
 function alCambiarMun() {
   const d = Object.keys(seccionesDe()).sort();
-  opciones($('u-dist'), d, $('u-mun').value ? 'Distrito' : '—', (v) => String(Number(v)));
+  opciones($('u-dist'), d, $('u-mun').value ? 'Distrito' : '—', (v) => nombreDistrito($('u-mun').value, v));
+  pintarNombreDistrito();
   alCambiarDist();
 }
 function alCambiarDist() {
+  pintarNombreDistrito();
   const s = seccionesDe()[$('u-dist').value] || [];
   opciones($('u-secc'), s, $('u-dist').value ? 'Sección' : '—', (v) => String(Number(v)));
   alCambiarSecc();
@@ -330,6 +391,10 @@ function irVotos() {
   $('v-nulos').value = v.nulos ?? '';
   $('v-blancos').value = v.blancos ?? '';
   listaVotos(borrador.tipo, u.provincia).forEach((p) => { $('p-' + p.id).value = v.partidos?.[p.id] ?? ''; });
+  // Campos que la IA no ha podido leer: vacíos y marcados en amarillo.
+  const dudosos = v.deLectura ? [...numIds.map((id) => $(id)), ...listaVotos(borrador.tipo, u.provincia).map((p) => $('p-' + p.id))].filter((i) => i.value === '') : [];
+  document.querySelectorAll('#s-votos input').forEach((i) => i.classList.toggle('revisar', dudosos.includes(i)));
+  avisoLectura('v-ia', v.deLectura ? borrador.lectura : null, dudosos.length ? `${dudosos.length} casilla(s) en amarillo no se han podido leer: complétalas.` : '');
   $('v-obs').value = borrador.observaciones || '';
   recalcular();
   show('s-votos');

@@ -6,6 +6,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const lector = require('./lector');
 
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
@@ -589,6 +590,16 @@ function rateLimitedEnvios(ip) {
   return e.n > 300;
 }
 
+const lecturas = new Map();
+function rateLimitedLecturas(ip) {
+  const now = Date.now();
+  const e = lecturas.get(ip) || { n: 0, t: now };
+  if (now - e.t > 10 * 60 * 1000) { e.n = 0; e.t = now; }
+  e.n++;
+  lecturas.set(ip, e);
+  return e.n > 200;
+}
+
 // ---------- HTTP helpers ----------
 function send(res, status, data, headers = {}) {
   const body = typeof data === 'string' || Buffer.isBuffer(data) ? data : JSON.stringify(data);
@@ -755,6 +766,29 @@ function guardarActa(body, user) {
   return acta;
 }
 
+// Ajusta lo leído por la IA a los nombres y formatos de la app (municipio oficial, distrito 2 cifras, etc.).
+function normalizarLectura(d) {
+  const num = (v) => (Number.isInteger(v) && v >= 0 ? v : null); // null = no se ha podido leer
+  const provincia = PROVINCIAS.includes(d.provincia) ? d.provincia : null;
+  const tipo = ['congreso', 'senado'].includes(d.tipo) ? d.tipo : null;
+  const soloDig = (x) => String(x || '').replace(/\D/g, '');
+  const municipio = provincia && d.municipio ? municipioOficial(provincia, d.municipio) : null;
+  const validos = new Set(provincia && tipo ? clavesVoto(tipo, provincia) : []);
+  const votos = {};
+  for (const v of d.votos || []) if (!validos.size || validos.has(v.id)) votos[v.id] = num(v.votos);
+  return {
+    esActa: d.es_acta !== false,
+    tipo, provincia, municipio,
+    municipioLeido: String(d.municipio || '').slice(0, 80),
+    distrito: soloDig(d.distrito) ? padNum(soloDig(d.distrito), 2) : '',
+    seccion: soloDig(d.seccion) ? padNum(soloDig(d.seccion), 3) : '',
+    mesa: String(d.mesa || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2),
+    censo: num(d.censo), votantes: num(d.votantes), nulos: num(d.nulos), blancos: num(d.blancos),
+    votos,
+    dudas: String(d.dudas || '').slice(0, 500),
+  };
+}
+
 function aPapelera(lista) {
   const dir = path.join(DATA_DIR, 'papelera', new Date().toISOString().replace(/[:.]/g, '-'));
   fs.mkdirSync(dir, { recursive: true });
@@ -871,12 +905,24 @@ async function handle(req, res) {
   const dispositivo = String(req.headers['x-dispositivo'] || '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 64);
   if (p === '/api/config' && m === 'GET') {
     cacheSecc ||= seccionesConfig();
-    return send(res, 200, { eleccion: config.eleccion, partidos: config.partidos, senado: config.senado, provincias: PROVINCIAS, municipios: municipiosConfig(), ...cacheSecc, hayListadoMesas: mesas.length > 0 });
+    return send(res, 200, { lecturaAutomatica: lector.disponible(), eleccion: config.eleccion, partidos: config.partidos, senado: config.senado, provincias: PROVINCIAS, municipios: municipiosConfig(), ...cacheSecc, hayListadoMesas: mesas.length > 0 });
   }
   if (p === '/api/mesas' && m === 'GET') {
     const prov = norm(url.searchParams.get('provincia')), mun = norm(url.searchParams.get('municipio'));
     return send(res, 200, mesas.filter((x) => norm(x.provincia) === prov && norm(x.municipio) === mun)
       .map((x) => ({ distrito: padNum(x.distrito, 2), seccion: padNum(x.seccion, 3), mesa: String(x.mesa).toUpperCase(), electores: toInt(x.electores) })));
+  }
+  // Lectura automática de la foto del acta (IA). Devuelve los datos para que el apoderado solo los revise.
+  if (p === '/api/leer-acta' && m === 'POST') {
+    if (!lector.disponible()) return send(res, 503, { error: 'La lectura automática no está activada', codigo: 'sin_ia' });
+    if (rateLimitedLecturas(clientIp(req))) return send(res, 429, { error: 'Demasiadas lecturas seguidas. Espera unos minutos.' });
+    const b = await readBody(req);
+    const mm = typeof b.foto === 'string' && b.foto.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
+    if (!mm) return send(res, 400, { error: 'Falta la foto' });
+    const t0 = Date.now();
+    const { datos, uso } = await lector.leerActa({ fotoBase64: mm[2], mediaType: mm[1], config, provincias: PROVINCIAS });
+    console.log(`[lectura] ${Date.now() - t0} ms · tokens entrada ${uso?.input_tokens} salida ${uso?.output_tokens}`);
+    return send(res, 200, { ok: true, lectura: normalizarLectura(datos) });
   }
   if (p === '/api/actas' && m === 'POST') {
     if (rateLimitedEnvios(clientIp(req))) return send(res, 429, { error: 'Demasiados envíos seguidos. Espera unos minutos.' });
@@ -1000,6 +1046,7 @@ async function handle(req, res) {
 
 const server = http.createServer((req, res) => {
   handle(req, res).catch((e) => {
+    if (e instanceof require('@anthropic-ai/sdk').APIError) { console.error('[lectura] error API', e.status, e.message); e = Object.assign(new Error('No se ha podido leer el acta automáticamente'), { status: 502 }); }
     if (e.status !== 400 && e.status !== 413) console.error(e);
     if (!res.headersSent) send(res, e.status || 500, { error: e.status ? e.message : 'Error del servidor' });
   });

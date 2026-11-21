@@ -26,6 +26,14 @@ El panel tiene un selector **Congreso / Senado** que cambia resultados, actas y 
 Las letras de mesa (U, A, B…) y el % escrutado salen del listado oficial de **8.923 mesas** de Catalunya de las
 Generales 2023 (Ministerio del Interior). Si la mesa del acta no aparece (o ha cambiado desde 2023), se puede escribir a mano: solo la letra («✏️ Escribir…» en el desplegable) o distrito, sección y mesa («¿No aparece tu distrito, sección o mesa?»).
 
+## Lectura automática de la foto (IA)
+
+Si la variable de entorno **`ANTHROPIC_API_KEY`** está configurada, al hacer la foto la app la envía al servidor, que la lee
+con Claude (modelo `claude-opus-5-5`, visión + salida estructurada) y **rellena solos** el tipo de acta, la mesa y todos los votos.
+El apoderado solo revisa: las casillas que no se han podido leer salen vacías y en amarillo, y el aviso indica las dudas.
+Sin la variable, la app funciona igual pero los datos se escriben a mano. La clave se crea en console.anthropic.com → API Keys
+y se pone en Render → Environment. Coste orientativo: unos pocos céntimos por acta leída.
+
 ## Cómo funciona (apoderado)
 
 1. Abre el enlace: **no hace falta iniciar sesión**.
@@ -85,7 +93,7 @@ Para que los móviles puedan entrar, el servidor tiene que estar accesible por *
 - Un VPS pequeño (Hetzner, OVH, DigitalOcean…) con Caddy delante, que pone HTTPS automático.
 - Render / Railway / Fly.io con un **disco persistente** montado y `DATA_DIR` apuntando a él.
 
-Variables de entorno: `PORT` (3000), `ADMIN_PASSWORD`, `DATA_DIR` (`./data`), `APP_SECRET` (opcional).
+Variables de entorno: `PORT` (3000), `ADMIN_PASSWORD`, `DATA_DIR` (`./data`), `ANTHROPIC_API_KEY` (lectura automática, opcional), `APP_SECRET` (opcional).
 
 **Copia de seguridad**: toda la información está en `DATA_DIR` (actas en JSON y fotos en JPG). Basta con copiar esa carpeta.
 

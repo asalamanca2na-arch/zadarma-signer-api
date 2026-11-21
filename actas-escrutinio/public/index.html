@@ -69,6 +69,7 @@
     <div class="topbar"><button class="btn ghost small" id="b-ubic-back">← Volver</button><div class="title">Paso 1 de 2 · Tus datos y mesa</div></div>
     <div class="steps"><span class="on"></span><span></span></div>
     <p class="muted">Comprueba que la mesa coincide con lo que pone en el acta.</p>
+    <div id="u-ia" class="ia hidden"></div>
     <div class="card">
       <h2>📄 ¿Qué acta es?</h2>
       <div class="tipo">
@@ -94,6 +95,7 @@
         <div><label for="u-secc">Sección</label><select id="u-secc" disabled></select><input id="u-secc-m" class="hidden" inputmode="numeric" placeholder="001"></div>
         <div><label for="u-mesa">Mesa</label><select id="u-mesa" disabled></select><input id="u-mesa-m" class="hidden" maxlength="2" placeholder="A" autocapitalize="characters" autocomplete="off"></div>
       </div>
+      <div id="u-dist-nom" class="muted hidden" style="margin-top:6px"></div>
       <button type="button" class="btn ghost small" id="b-manual" style="margin-top:6px;padding-left:0;text-align:left">✏️ ¿No aparece tu distrito, sección o mesa? Escríbelos a mano</button>
       <div id="u-err" class="error hidden"></div>
     </form>
@@ -111,6 +113,7 @@
       <button class="btn ghost small" data-back="s-ubic">✏️</button>
     </div>
 
+    <div id="v-ia" class="ia hidden"></div>
     <div id="v-status" class="status ok"></div>
 
     <div class="card">

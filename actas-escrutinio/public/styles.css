@@ -92,3 +92,7 @@ a { color: var(--primary); }
 .cand label { margin: 0; color: var(--text); font-size: .95rem; }
 .cand .partido-cab { grid-column: 1 / -1; margin-top: 10px; font-weight: 700; }
 .grupo-partido { font-weight: 700; margin: 14px 0 2px; display: flex; align-items: center; gap: 6px; }
+
+.ia { background: #eef4ff; border: 1px solid #c9dafc; color: #163b7a; border-radius: 12px; padding: 12px 14px; margin: 10px 0; font-size: .95rem; }
+.ia small { color: #7a4d00; }
+input.revisar { background: #fff6d6; border-color: #e0b400; }
