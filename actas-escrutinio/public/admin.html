@@ -138,6 +138,17 @@
         <button class="btn small" id="b-mesas">Cargar mesas</button> <span id="c-mesas-msg" class="muted"></span>
       </div>
       <div class="card">
+        <h2>🏙️ Nombres de los distritos</h2>
+        <p class="muted">Los distritos del acta son <b>distritos censales</b> y solo tienen número. Para que los apoderados los reconozcan, podéis ponerles nombre (por ejemplo, el barrio). Barcelona ciudad ya viene con sus 10 distritos.</p>
+        <ol class="muted" style="margin:6px 0 10px;padding-left:20px">
+          <li><a href="#" id="b-dist-csv">Descarga la plantilla</a>: todos los municipios con más de un distrito (117) y sus distritos.</li>
+          <li>Ábrela en Excel y rellena la columna <b>nombre</b> de los que queráis. Las filas sin nombre se ignoran.</li>
+          <li>Guárdala como CSV y súbela aquí.</li>
+        </ol>
+        <input type="file" id="c-dist-file" accept=".csv,text/csv,text/plain">
+        <button class="btn small" id="b-dist">Cargar nombres</button> <span id="c-dist-msg" class="muted"></span>
+      </div>
+      <div class="card">
         <h2>🗑 Borrar actas de prueba</h2>
         <p class="muted">Úsalo <b>antes de la noche electoral</b> para empezar de cero después de las pruebas. Una sola acta se borra desde su ficha.</p>
         <button class="btn danger small" id="b-borrar-todas">Borrar todas las actas</button> <span id="c-borrar-msg" class="muted"></span>

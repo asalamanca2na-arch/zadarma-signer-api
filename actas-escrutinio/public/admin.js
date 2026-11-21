@@ -298,6 +298,8 @@ $('b-borrar-todas').addEventListener('click', async () => {
     $('c-borrar-msg').textContent = `✓ ${r.borradas} actas borradas`; refrescar();
   } catch (e) { $('c-borrar-msg').textContent = '⚠ ' + e.message; }
 });
+$('b-dist').addEventListener('click', () => subirCSV('c-dist-file', '/api/admin/distritos', 'c-dist-msg'));
+$('b-dist-csv').addEventListener('click', (e) => { e.preventDefault(); location.href = '/api/admin/distritos.csv?t=' + encodeURIComponent(token); });
 $('b-mesas').addEventListener('click', () => subirCSV('c-mesas-file', '/api/admin/mesas', 'c-mesas-msg'));
 
 // ---------- arranque ----------

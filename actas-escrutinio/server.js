@@ -873,6 +873,12 @@ function seccionesConfig() {
 }
 let cacheSecc = null;
 
+// Nombres de los distritos censales: { provincia: { municipio: { '01': 'Nombre' } } }.
+// Solo Barcelona ciudad viene de serie (sus distritos censales son sus 10 distritos); el resto se carga desde el panel.
+const distritosFile = path.join(DATA_DIR, 'distritos.json');
+const DISTRITOS_BCN = { Barcelona: { Barcelona: { '01': 'Ciutat Vella', '02': 'Eixample', '03': 'Sants-Montjuïc', '04': 'Les Corts', '05': 'Sarrià-Sant Gervasi', '06': 'Gràcia', '07': 'Horta-Guinardó', '08': 'Nou Barris', '09': 'Sant Andreu', '10': 'Sant Martí' } } };
+let distritos = readJSON(distritosFile, null) || DISTRITOS_BCN;
+
 function municipiosConfig() {
   const out = {};
   for (const p of PROVINCIAS) out[p] = [...(MUNICIPIOS[p] || [])];
@@ -905,7 +911,7 @@ async function handle(req, res) {
   const dispositivo = String(req.headers['x-dispositivo'] || '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 64);
   if (p === '/api/config' && m === 'GET') {
     cacheSecc ||= seccionesConfig();
-    return send(res, 200, { lecturaAutomatica: lector.disponible(), eleccion: config.eleccion, partidos: config.partidos, senado: config.senado, provincias: PROVINCIAS, municipios: municipiosConfig(), ...cacheSecc, hayListadoMesas: mesas.length > 0 });
+    return send(res, 200, { distritos, lecturaAutomatica: lector.disponible(), eleccion: config.eleccion, partidos: config.partidos, senado: config.senado, provincias: PROVINCIAS, municipios: municipiosConfig(), ...cacheSecc, hayListadoMesas: mesas.length > 0 });
   }
   if (p === '/api/mesas' && m === 'GET') {
     const prov = norm(url.searchParams.get('provincia')), mun = norm(url.searchParams.get('municipio'));
@@ -1020,6 +1026,34 @@ async function handle(req, res) {
       config = { eleccion: String(b.eleccion || config.eleccion).trim(), partidos, senado };
       writeJSON(configFile, config);
       return send(res, 200, { ok: true, config });
+    }
+    // Plantilla/listado de distritos: todos los municipios con más de un distrito, con el nombre si ya lo tiene.
+    if (p === '/api/admin/distritos.csv' && m === 'GET') {
+      cacheSecc ||= seccionesConfig();
+      const filas = [['provincia', 'municipio', 'distrito', 'secciones', 'nombre'].join(';')];
+      for (const pr of PROVINCIAS) for (const mun of Object.keys(cacheSecc.secciones[pr] || {}).sort((a, b) => a.localeCompare(b, 'ca'))) {
+        const ds = Object.keys(cacheSecc.secciones[pr][mun]).sort();
+        if (ds.length < 2 && !distritos[pr]?.[mun]) continue;
+        for (const d of ds) filas.push([pr, mun, d, cacheSecc.secciones[pr][mun][d].length, distritos[pr]?.[mun]?.[d] || ''].map(csvCell).join(';'));
+      }
+      return send(res, 200, '\uFEFF' + filas.join('\r\n'), { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="distritos.csv"' });
+    }
+    if (p === '/api/admin/distritos' && m === 'PUT') {
+      const b = await readBody(req);
+      const nuevo = {}; const errores = []; let n = 0;
+      parseCSV(b.csv).forEach((r, i) => {
+        const nombre = String(r.nombre || r.nom || '').trim();
+        if (!nombre) return; // filas sin nombre: se ignoran
+        const pr = PROVINCIAS.find((x) => norm(x) === norm(r.provincia));
+        const mun = pr && municipioOficial(pr, r.municipio || r.municipi);
+        const d = padNum(r.distrito || r.districte, 2);
+        if (!pr || !mun || !/^\d{2}$/.test(d)) { errores.push(`Fila ${i + 2}: provincia, municipio o distrito no válidos`); return; }
+        ((nuevo[pr] ||= {})[mun] ||= {})[d] = nombre.slice(0, 60); n++;
+      });
+      if (!n) return send(res, 400, { error: 'No hay ningún nombre en el fichero. Rellena la columna «nombre».', errores: errores.slice(0, 20) });
+      distritos = nuevo;
+      writeJSON(distritosFile, distritos);
+      return send(res, 200, { ok: true, total: n, errores: errores.slice(0, 20) });
     }
     if (p === '/api/admin/mesas' && m === 'PUT') {
       const b = await readBody(req);

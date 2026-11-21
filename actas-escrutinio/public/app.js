@@ -257,10 +257,11 @@ function alCambiarProv() {
   alCambiarMun();
 }
 // Nombres de los distritos (los distritos censales de Barcelona coinciden con sus 10 distritos municipales).
-const DISTRITOS = { Barcelona: { '01': 'Ciutat Vella', '02': 'Eixample', '03': 'Sants-Montjuïc', '04': 'Les Corts', '05': 'Sarrià-Sant Gervasi', '06': 'Gràcia', '07': 'Horta-Guinardó', '08': 'Nou Barris', '09': 'Sant Andreu', '10': 'Sant Martí' } };
-const nombreDistrito = (mun, d) => String(Number(d)) + (DISTRITOS[mun]?.[d] ? ' · ' + DISTRITOS[mun][d] : '');
+// Nombres de los distritos (los de Barcelona ciudad vienen de serie; el resto se cargan desde el panel).
+const nombreDe = (mun, d) => cfg.distritos?.[$('u-prov').value]?.[mun]?.[d] || '';
+const nombreDistrito = (mun, d) => String(Number(d)) + (nombreDe(mun, d) ? ' · ' + nombreDe(mun, d) : '');
 function pintarNombreDistrito() {
-  const n = DISTRITOS[$('u-mun').value]?.[$('u-dist').value];
+  const n = nombreDe($('u-mun').value, $('u-dist').value);
   $('u-dist-nom').textContent = n ? 'Distrito ' + Number($('u-dist').value) + ': ' + n : '';
   $('u-dist-nom').classList.toggle('hidden', !n);
 }
