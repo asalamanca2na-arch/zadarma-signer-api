@@ -142,11 +142,17 @@ async function verActa(id) {
         <p class="muted">Enviada por ${esc(a.enviadoPor?.nombre || 'Sin nombre')} · ${new Date(a.recibido).toLocaleString('es-ES')}</p>
         ${(a.historial || []).length ? `<details><summary><b>${a.historial.length} versión(es) anterior(es)</b></summary>${a.historial.map((h) => `<div class="card" style="background:#f6f8fb"><div class="muted">${esc(h.enviadoPor?.nombre)} · ${new Date(h.recibido).toLocaleString('es-ES')}</div>${tablaVotos(h, P)}</div>`).join('')}</details>` : ''}
         <div style="height:10px"></div>
+        <button class="btn danger" id="m-del" style="margin-bottom:10px">🗑 Borrar esta acta</button>
         <button class="btn ${a.revisada ? 'secondary' : ''}" id="m-rev">${a.revisada ? 'Quitar marca de revisada' : '✓ Marcar como revisada'}</button>
       </div>
     </div>`;
   $('modal').classList.add('open');
   $('m-close').onclick = () => $('modal').classList.remove('open');
+  $('m-del').onclick = async () => {
+    if (!confirm('¿Borrar esta acta? Desaparecerá del recuento.')) return;
+    await api('/api/admin/acta/borrar', { method: 'POST', body: { id: a.id } });
+    $('modal').classList.remove('open'); refrescar();
+  };
   $('m-rev').onclick = async () => {
     await api('/api/admin/acta/revisada', { method: 'POST', body: { id: a.id, revisada: !a.revisada } });
     $('modal').classList.remove('open'); refrescar();
@@ -183,6 +189,14 @@ async function subirCSV(fileId, url, msgId, extra = {}) {
     cargarConfig(); refrescar();
   } catch (e) { $(msgId).textContent = '⚠ ' + e.message + (e.data?.errores?.length ? ' — ' + e.data.errores.slice(0, 3).join('; ') : ''); }
 }
+$('b-borrar-todas').addEventListener('click', async () => {
+  const c = prompt('Esto borra TODAS las actas recibidas (por ejemplo, las de prueba). Escribe BORRAR para confirmar:');
+  if (c !== 'BORRAR') return;
+  try {
+    const r = await api('/api/admin/borrar-todas', { method: 'POST', body: { confirmacion: 'BORRAR' } });
+    $('c-borrar-msg').textContent = `✓ ${r.borradas} actas borradas`; refrescar();
+  } catch (e) { $('c-borrar-msg').textContent = '⚠ ' + e.message; }
+});
 $('b-mesas').addEventListener('click', () => subirCSV('c-mesas-file', '/api/admin/mesas', 'c-mesas-msg'));
 
 // ---------- arranque ----------

@@ -179,12 +179,29 @@ function irUbicacion() {
   show('s-ubic');
 }
 $('b-ubic-back').addEventListener('click', () => show(borrador?.foto ? 's-foto' : 's-home'));
+// Reconoce el municipio aunque falten acentos o el artículo, o esté a medias si solo hay uno posible
+// («hospitalet» → «L'Hospitalet de Llobregat», «bisbal d'emporda» → «La Bisbal d'Empordà»).
+const claveMun = (s) => String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/^(el|la|els|les|es|sa|ses) |^(l|s)['’]/, '').replace(/['’`.,·-]/g, '').replace(/\s+/g, ' ').trim();
+function municipioOficial(prov, txt) {
+  const k = claveMun(txt);
+  if (k.length < 2) return null;
+  const lista = cfg?.municipios?.[prov] || [];
+  const exacto = lista.find((m) => claveMun(m) === k);
+  if (exacto) return exacto;
+  const empiezan = lista.filter((m) => claveMun(m).startsWith(k));
+  return empiezan.length === 1 ? empiezan[0] : null;
+}
 function rellenarMunicipios() {
   const lista = cfg?.municipios?.[$('u-prov').value] || [];
   $('dl-mun').innerHTML = lista.map((m) => `<option value="${esc(m)}">`).join('');
 }
 $('u-prov').addEventListener('change', () => { rellenarMunicipios(); $('u-mun').value = ''; cargarMesas(); });
-$('u-mun').addEventListener('change', () => cargarMesas());
+$('u-mun').addEventListener('change', () => {
+  const o = municipioOficial($('u-prov').value, $('u-mun').value);
+  if (o) $('u-mun').value = o;
+  cargarMesas();
+});
 
 let mesasCargadas = null; // provincia|municipio de la lista mostrada
 async function cargarMesas(preferida) {
@@ -225,9 +242,14 @@ $('b-ubic-ok').addEventListener('click', () => {
   if (nombre.length < 3) return err('Escribe tu nombre y apellido.');
   if (colegio.length < 3) return err('Escribe el nombre del colegio electoral.');
   store.set('nombre', nombre); store.set('colegio', colegio);
-  const prov = $('u-prov').value, mun = $('u-mun').value.trim();
+  const prov = $('u-prov').value;
   if (!prov) return err('Elige la provincia.');
-  if (!mun) return err('Escribe el municipio.');
+  if (!$('u-mun').value.trim()) return err('Escribe el municipio.');
+  const oficial = municipioOficial(prov, $('u-mun').value);
+  if (cfg?.municipios?.[prov]?.length && !oficial)
+    return err(`No encontramos «${$('u-mun').value.trim()}» en la provincia de ${prov}. Empieza a escribirlo y elige el nombre de la lista. ¿Es correcta la provincia?`);
+  if (oficial) $('u-mun').value = oficial;
+  const mun = $('u-mun').value.trim();
   let u;
   if (mesasMunicipio.length) {
     const m = mesasMunicipio[Number($('u-mesa-list').value)];
@@ -236,8 +258,6 @@ $('b-ubic-ok').addEventListener('click', () => {
   } else {
     u = { provincia: prov, municipio: mun, distrito: $('u-dist').value.trim(), seccion: $('u-secc').value.trim(), mesa: $('u-mesa').value };
     if (!u.distrito || !u.seccion) return err('Completa distrito y sección.');
-    if (cfg?.municipios?.[prov]?.length && !cfg.municipios[prov].some((x) => x.toLowerCase() === mun.toLowerCase()))
-      if (!confirm(`"${mun}" no está en el listado de ${prov}. ¿Seguro que está bien escrito?`)) return;
   }
   u.colegio = colegio;
   borrador.ubicacion = u; borrador.nombre = nombre;

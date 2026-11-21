@@ -248,6 +248,7 @@ function calcula(a) {
   const m = mesasIndex.get(a.id);
   if (m && toInt(m.electores) && a.censo && toInt(m.electores) !== a.censo) avisos.push(`Censo distinto al oficial (${m.electores})`);
   if (mesas.length && !m) avisos.push('Mesa no está en el listado');
+  if (Object.keys(MUNICIPIOS).length && !municipioOficial(a.provincia, a.municipio) && !m) avisos.push('Municipio no reconocido');
   if (a.conflicto) avisos.push('Hay otra versión distinta del acta');
   if (a.observaciones) avisos.push('Tiene observaciones');
   a.avisos = avisos;
@@ -278,7 +279,11 @@ function guardarActa(body, user) {
   if (nombre.length < 3) throw Object.assign(new Error('Falta tu nombre'), { status: 400 });
   if (colegio.length < 3) throw Object.assign(new Error('Falta el nombre del colegio electoral'), { status: 400 });
   const oficial = mesas.find((x) => norm(x.provincia) === norm(provincia) && norm(x.municipio) === norm(ubic.municipio));
-  if (oficial) ubic.municipio = oficial.municipio; // nombre tal cual está en el listado oficial
+  if (oficial) ubic.municipio = oficial.municipio; // nombre tal cual está en el listado de mesas
+  else {
+    const mo = municipioOficial(provincia, ubic.municipio);
+    if (mo) ubic.municipio = mo; // nombre oficial del INE
+  }
   const id = mesaKey(ubic);
   const v = body.votos || {};
   const votos = {};
@@ -327,6 +332,19 @@ function guardarActa(body, user) {
   return acta;
 }
 
+function aPapelera(lista) {
+  const dir = path.join(DATA_DIR, 'papelera', new Date().toISOString().replace(/[:.]/g, '-'));
+  fs.mkdirSync(dir, { recursive: true });
+  for (const a of lista) {
+    const f = fileIdFor(a.id) + '.json';
+    try { fs.renameSync(path.join(ACTAS_DIR, f), path.join(dir, f)); } catch {}
+    for (const v of [a, ...(a.historial || [])]) {
+      if (v.foto) try { fs.renameSync(path.join(FOTOS_DIR, v.foto), path.join(dir, v.foto)); } catch {}
+    }
+    actas.delete(a.id);
+  }
+}
+
 function resumen() {
   const lista = [...actas.values()];
   const tot = { actas: lista.length, mesasTotal: mesas.length, censo: 0, votantes: 0, nulos: 0, blancos: 0, validos: 0, incidencias: 0, votos: {} };
@@ -355,9 +373,16 @@ function resumen() {
   };
 }
 
+// Municipios oficiales de Catalunya (INE, 947). Clave sin acentos ni artículo inicial para reconocer «Hospitalet» = «L'Hospitalet de Llobregat».
+const MUNICIPIOS = readJSON(path.join(__dirname, 'municipios.json'), {});
+const claveMun = (s) => norm(s).replace(/^(el|la|els|les|es|sa|ses) |^(l|s)['’]/, '').replace(/['’`.,·-]/g, '').replace(/\s+/g, ' ').trim();
+const indiceMun = new Map();
+for (const [p, lista] of Object.entries(MUNICIPIOS)) for (const m of lista) indiceMun.set(p + '|' + claveMun(m), m);
+function municipioOficial(prov, nombre) { return indiceMun.get(prov + '|' + claveMun(nombre)) || null; }
+
 function municipiosConfig() {
   const out = {};
-  for (const p of PROVINCIAS) out[p] = [];
+  for (const p of PROVINCIAS) out[p] = [...(MUNICIPIOS[p] || [])];
   for (const m of mesas) {
     const p = PROVINCIAS.find((x) => norm(x) === norm(m.provincia));
     if (p && !out[p].includes(m.municipio)) out[p].push(m.municipio);
@@ -424,6 +449,21 @@ async function handle(req, res) {
       calcula(a);
       writeJSON(path.join(ACTAS_DIR, fileIdFor(a.id) + '.json'), a);
       return send(res, 200, { ok: true });
+    }
+    // Borrar = mover a data/papelera/<fecha>/ (se puede recuperar a mano si hace falta).
+    if (p === '/api/admin/acta/borrar' && m === 'POST') {
+      const b = await readBody(req);
+      const a = actas.get(b.id);
+      if (!a) return send(res, 404, { error: 'No existe' });
+      aPapelera([a]);
+      return send(res, 200, { ok: true });
+    }
+    if (p === '/api/admin/borrar-todas' && m === 'POST') {
+      const b = await readBody(req);
+      if (b.confirmacion !== 'BORRAR') return send(res, 400, { error: 'Escribe BORRAR para confirmar' });
+      const n = actas.size;
+      aPapelera([...actas.values()]);
+      return send(res, 200, { ok: true, borradas: n });
     }
     if (p === '/api/admin/foto' && m === 'GET') {
       const f = path.basename(url.searchParams.get('f') || '');
