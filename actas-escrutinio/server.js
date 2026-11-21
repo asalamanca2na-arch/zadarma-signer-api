@@ -61,6 +61,407 @@ const DEFAULT_CONFIG = {
     { id: 'cnv', nombre: 'Convergents (CNV)', color: '#003f7f', orden: { Tarragona: 10 } },
   ],
 };
+// Senado: candidatos proclamados por provincia, en el orden de la papeleta (BOE-A-2026-23103).
+const DEFAULT_SENADO = {
+  "Barcelona": [
+   {
+    "id": "psc-raquel-sanchez-jimenez",
+    "nombre": "Raquel Sánchez Jimenez",
+    "partido": "PSC",
+    "color": "#e30613"
+   },
+   {
+    "id": "psc-gabriel-colome-garcia",
+    "nombre": "Gabriel Colomé Garcia",
+    "partido": "PSC",
+    "color": "#e30613"
+   },
+   {
+    "id": "psc-cristobalina-albendiz-perez",
+    "nombre": "Cristobalina Albéndiz Pérez",
+    "partido": "PSC",
+    "color": "#e30613"
+   },
+   {
+    "id": "jxcat-josep-maria-vida-de-abadal-i-serra",
+    "nombre": "Josep Maria Vida de Abadal i Serra",
+    "partido": "Junts",
+    "color": "#20c0b2"
+   },
+   {
+    "id": "jxcat-anna-cols-i-aguilar",
+    "nombre": "Anna Cols i Aguilar",
+    "partido": "Junts",
+    "color": "#20c0b2"
+   },
+   {
+    "id": "jxcat-oriol-izquierdo-i-llopis",
+    "nombre": "Oriol Izquierdo i Llopis",
+    "partido": "Junts",
+    "color": "#20c0b2"
+   },
+   {
+    "id": "erc-eh-bildu-francesc-marc-alvaro-i-vidal",
+    "nombre": "Francesc-Marc Álvaro i Vidal",
+    "partido": "ERC-EH Bildu",
+    "color": "#f4b400"
+   },
+   {
+    "id": "erc-eh-bildu-mercedes-vidal-lago",
+    "nombre": "Mercedes Vidal Lago",
+    "partido": "ERC-EH Bildu",
+    "color": "#f4b400"
+   },
+   {
+    "id": "erc-eh-bildu-joaquim-pim-camprubi-i-cabane",
+    "nombre": "Joaquim (Pim) Camprubí i Cabané",
+    "partido": "ERC-EH Bildu",
+    "color": "#f4b400"
+   },
+   {
+    "id": "pctc-ferran-peris-serrano",
+    "nombre": "Ferran Peris Serrano",
+    "partido": "PCTC",
+    "color": "#c00000"
+   },
+   {
+    "id": "c-dem-laura-alzamora-merino",
+    "nombre": "Laura Alzamora Merino",
+    "partido": "Comuns-Front Ampli",
+    "color": "#8a3f8f"
+   },
+   {
+    "id": "c-dem-miquel-angel-essomba-gelabert",
+    "nombre": "Miquel Àngel Essomba Gelabert",
+    "partido": "Comuns-Front Ampli",
+    "color": "#8a3f8f"
+   },
+   {
+    "id": "c-dem-aida-llaurado-alvarez",
+    "nombre": "Aïda Llauradó Álvarez",
+    "partido": "Comuns-Front Ampli",
+    "color": "#8a3f8f"
+   },
+   {
+    "id": "vox-maria-elisa-garcia-fuster",
+    "nombre": "María Elisa García Fuster",
+    "partido": "VOX",
+    "color": "#63be21"
+   },
+   {
+    "id": "vox-jorge-mena-galvez",
+    "nombre": "Jorge Mena Gálvez",
+    "partido": "VOX",
+    "color": "#63be21"
+   },
+   {
+    "id": "vox-maria-montserrat-piqueras-ruiz",
+    "nombre": "María Montserrat Piqueras Ruiz",
+    "partido": "VOX",
+    "color": "#63be21"
+   },
+   {
+    "id": "pp-josep-tutusaus-besante",
+    "nombre": "Josep Tutusaus Besante",
+    "partido": "PP",
+    "color": "#1d84ce"
+   },
+   {
+    "id": "pp-monica-pares-centeno",
+    "nombre": "Mónica Parés Centeno",
+    "partido": "PP",
+    "color": "#1d84ce"
+   },
+   {
+    "id": "pp-javier-guasch-torrens",
+    "nombre": "Javier Guasch Torrens",
+    "partido": "PP",
+    "color": "#1d84ce"
+   }
+  ],
+  "Girona": [
+   {
+    "id": "psc-gael-rodriguez-garrido",
+    "nombre": "Gael Rodríguez Garrido",
+    "partido": "PSC",
+    "color": "#e30613"
+   },
+   {
+    "id": "psc-consol-cantenys-arboli",
+    "nombre": "Consol Cantenys Arbolí",
+    "partido": "PSC",
+    "color": "#e30613"
+   },
+   {
+    "id": "psc-moises-tomas-alcobe",
+    "nombre": "Moisès Tomàs Alcobé",
+    "partido": "PSC",
+    "color": "#e30613"
+   },
+   {
+    "id": "jxcat-joan-bague-i-roura",
+    "nombre": "Joan Bagué i Roura",
+    "partido": "Junts",
+    "color": "#20c0b2"
+   },
+   {
+    "id": "jxcat-julia-barcelo-i-puig",
+    "nombre": "Júlia Barceló i Puig",
+    "partido": "Junts",
+    "color": "#20c0b2"
+   },
+   {
+    "id": "jxcat-pau-taberner-i-pibernat",
+    "nombre": "Pau Taberner i Pibernat",
+    "partido": "Junts",
+    "color": "#20c0b2"
+   },
+   {
+    "id": "erc-eh-bildu-etna-estrems-fayos",
+    "nombre": "Etna Estrems Fayos",
+    "partido": "ERC-EH Bildu",
+    "color": "#f4b400"
+   },
+   {
+    "id": "erc-eh-bildu-miquel-reverter-tres",
+    "nombre": "Miquel Reverter Tres",
+    "partido": "ERC-EH Bildu",
+    "color": "#f4b400"
+   },
+   {
+    "id": "erc-eh-bildu-roser-carre-gonzalez",
+    "nombre": "Roser Carré Gonzàlez",
+    "partido": "ERC-EH Bildu",
+    "color": "#f4b400"
+   },
+   {
+    "id": "pctc-bernat-roig-arnau",
+    "nombre": "Bernat Roig Arnau",
+    "partido": "PCTC",
+    "color": "#c00000"
+   },
+   {
+    "id": "vox-francisco-javier-dominguez-garcia",
+    "nombre": "Francisco Javier Domínguez García",
+    "partido": "VOX",
+    "color": "#63be21"
+   },
+   {
+    "id": "vox-maria-carmen-comas-viladot",
+    "nombre": "María Carmen Comas Viladot",
+    "partido": "VOX",
+    "color": "#63be21"
+   },
+   {
+    "id": "vox-geronimo-vargas-henao",
+    "nombre": "Gerónimo Vargas Henao",
+    "partido": "VOX",
+    "color": "#63be21"
+   }
+  ],
+  "Lleida": [
+   {
+    "id": "psc-jan-pomes-lopez",
+    "nombre": "Jan Pomés López",
+    "partido": "PSC",
+    "color": "#e30613"
+   },
+   {
+    "id": "psc-pasion-gador-romero-garcia",
+    "nombre": "Pasión Gador Romero García",
+    "partido": "PSC",
+    "color": "#e30613"
+   },
+   {
+    "id": "psc-carlos-trinidad-ortega",
+    "nombre": "Carlos Trinidad Ortega",
+    "partido": "PSC",
+    "color": "#e30613"
+   },
+   {
+    "id": "jxcat-rosa-maria-melines-i-rius",
+    "nombre": "Rosa Maria Melines i Rius",
+    "partido": "Junts",
+    "color": "#20c0b2"
+   },
+   {
+    "id": "jxcat-emili-gilabert-i-roca",
+    "nombre": "Emili Gilabert i Roca",
+    "partido": "Junts",
+    "color": "#20c0b2"
+   },
+   {
+    "id": "jxcat-judit-guim-i-tarruella",
+    "nombre": "Judit Guim i Tarruella",
+    "partido": "Junts",
+    "color": "#20c0b2"
+   },
+   {
+    "id": "erc-eh-bildu-silvia-martinez-i-fuentes",
+    "nombre": "Sílvia Martínez i Fuentes",
+    "partido": "ERC-EH Bildu",
+    "color": "#f4b400"
+   },
+   {
+    "id": "erc-eh-bildu-pol-oliva-i-sole",
+    "nombre": "Pol Oliva i Solé",
+    "partido": "ERC-EH Bildu",
+    "color": "#f4b400"
+   },
+   {
+    "id": "erc-eh-bildu-judith-gisbert-i-ester",
+    "nombre": "Judith Gisbert i Ester",
+    "partido": "ERC-EH Bildu",
+    "color": "#f4b400"
+   },
+   {
+    "id": "pctc-guillem-sans-garrote",
+    "nombre": "Guillem Sans Garrote",
+    "partido": "PCTC",
+    "color": "#c00000"
+   },
+   {
+    "id": "pp-jose-ramon-guiu-estopa",
+    "nombre": "José Ramón Guiu Estopá",
+    "partido": "PP",
+    "color": "#1d84ce"
+   },
+   {
+    "id": "pp-ana-cava-munoz",
+    "nombre": "Ana Cava Muñoz",
+    "partido": "PP",
+    "color": "#1d84ce"
+   },
+   {
+    "id": "pp-miguel-angel-balao-garcia",
+    "nombre": "Miguel Angel Balao Garcia",
+    "partido": "PP",
+    "color": "#1d84ce"
+   },
+   {
+    "id": "vox-isabel-mas-picatoste",
+    "nombre": "Isabel Mas Picatoste",
+    "partido": "VOX",
+    "color": "#63be21"
+   },
+   {
+    "id": "vox-antonio-blas-marti-martin",
+    "nombre": "Antonio Blas Martí Martín",
+    "partido": "VOX",
+    "color": "#63be21"
+   },
+   {
+    "id": "vox-paula-garcia-castellanos",
+    "nombre": "Paula García Castellanos",
+    "partido": "VOX",
+    "color": "#63be21"
+   }
+  ],
+  "Tarragona": [
+   {
+    "id": "psc-manel-de-la-vega-carrera",
+    "nombre": "Manel de la Vega Carrera",
+    "partido": "PSC",
+    "color": "#e30613"
+   },
+   {
+    "id": "psc-montse-garcia-biosca",
+    "nombre": "Montse García Biosca",
+    "partido": "PSC",
+    "color": "#e30613"
+   },
+   {
+    "id": "psc-xavier-lorenzo-torres",
+    "nombre": "Xavier Lorenzo Torres",
+    "partido": "PSC",
+    "color": "#e30613"
+   },
+   {
+    "id": "erc-eh-bildu-noemi-llaurado-sans",
+    "nombre": "Noemí Llauradó Sans",
+    "partido": "ERC-EH Bildu",
+    "color": "#f4b400"
+   },
+   {
+    "id": "erc-eh-bildu-xavier-faura-sanmartin",
+    "nombre": "Xavier Faura Sanmartín",
+    "partido": "ERC-EH Bildu",
+    "color": "#f4b400"
+   },
+   {
+    "id": "erc-eh-bildu-montserrat-ventura-jane",
+    "nombre": "Montserrat Ventura Jané",
+    "partido": "ERC-EH Bildu",
+    "color": "#f4b400"
+   },
+   {
+    "id": "jxcat-josep-andreu-i-domingo",
+    "nombre": "Josep Andreu i Domingo",
+    "partido": "Junts",
+    "color": "#20c0b2"
+   },
+   {
+    "id": "jxcat-montserrat-vellve-i-foix",
+    "nombre": "Montserrat Vellvé i Foix",
+    "partido": "Junts",
+    "color": "#20c0b2"
+   },
+   {
+    "id": "jxcat-felip-monclus-i-arasa",
+    "nombre": "Felip Monclús i Arasa",
+    "partido": "Junts",
+    "color": "#20c0b2"
+   },
+   {
+    "id": "pctc-albert-camarasa-escubedo",
+    "nombre": "Albert Camarasa Escubedo",
+    "partido": "PCTC",
+    "color": "#c00000"
+   },
+   {
+    "id": "vox-ana-belen-rodriguez-ros",
+    "nombre": "Ana Belén Rodríguez Ros",
+    "partido": "VOX",
+    "color": "#63be21"
+   },
+   {
+    "id": "vox-francisco-javier-vaquero-rodriguez",
+    "nombre": "Francisco Javier Vaquero Rodríguez",
+    "partido": "VOX",
+    "color": "#63be21"
+   },
+   {
+    "id": "vox-maria-dolores-zamora-carmona",
+    "nombre": "María Dolores Zamora Carmona",
+    "partido": "VOX",
+    "color": "#63be21"
+   },
+   {
+    "id": "cnv-demelsa-bartual-soria",
+    "nombre": "Demelsa Bartual Soria",
+    "partido": "Convergents",
+    "color": "#003f7f"
+   },
+   {
+    "id": "cnv-manuel-andres-marin-garcia",
+    "nombre": "Manuel Andrés Marín García",
+    "partido": "Convergents",
+    "color": "#003f7f"
+   },
+   {
+    "id": "cnv-merce-alicia-sans-saez",
+    "nombre": "Mercè Alicia Sans Sáez",
+    "partido": "Convergents",
+    "color": "#003f7f"
+   },
+   {
+    "id": "mundo-justo-maria-del-carmen-barros-ruiz",
+    "nombre": "María del Carmen Barros Ruiz",
+    "partido": "Mundo+Justo",
+    "color": "#7a8a99"
+   }
+  ]
+};
 // Una candidatura se presenta en una provincia si no tiene "orden" (= en todas) o si tiene número para esa provincia.
 const sePresenta = (p, prov) => !p.orden || !Object.keys(p.orden).length || p.orden[prov] != null;
 const configFile = path.join(DATA_DIR, 'config.json');
@@ -68,6 +469,10 @@ const mesasFile = path.join(DATA_DIR, 'mesas.json');
 
 let config = readJSON(configFile, null);
 if (!config) { config = DEFAULT_CONFIG; writeJSON(configFile, config); }
+if (!config.senado) { config.senado = DEFAULT_SENADO; config.eleccion = 'Generales 29-N 2026'; writeJSON(configFile, config); }
+const TIPOS = ['congreso', 'senado'];
+// Claves de voto de un acta: candidaturas (Congreso) o candidatos de la provincia (Senado).
+const clavesVoto = (tipo, prov) => tipo === 'senado' ? (config.senado[prov] || []).map((c) => c.id) : config.partidos.filter((p) => sePresenta(p, prov)).map((p) => p.id);
 let mesas = readJSON(mesasFile, []);
 let mesasIndex = new Map();
 function indexarMesas() { mesasIndex = new Map(mesas.map((x) => [mesaKey(x), x])); }
@@ -237,19 +642,34 @@ function serveStatic(req, res, pathname) {
 
 // ---------- lógica de actas ----------
 function calcula(a) {
-  const sumaPartidos = Object.values(a.votos).reduce((s, n) => s + (n || 0), 0);
-  const total = sumaPartidos + a.blancos + a.nulos;
-  a.validos = sumaPartidos + a.blancos;
-  a.diferencia = a.votantes - total; // >0 faltan votos, <0 sobran
-  a.cuadra = a.diferencia === 0;
   const avisos = [];
-  if (!a.cuadra) avisos.push(a.diferencia > 0 ? `Faltan ${a.diferencia} votos` : `Sobran ${-a.diferencia} votos`);
+  const suma = Object.values(a.votos).reduce((s, n) => s + (n || 0), 0);
+  if (a.tipo === 'senado') {
+    // Senado: cada papeleta puede marcar hasta 3 candidatos, así que la suma no tiene que coincidir con los votantes.
+    const papeletas = a.votantes - a.nulos - a.blancos; // papeletas válidas con algún candidato marcado
+    a.validos = a.votantes - a.nulos;
+    a.diferencia = 0;
+    if (papeletas < 0) avisos.push('Nulos + blancos superan a los votantes');
+    const max = Math.max(0, ...Object.values(a.votos));
+    if (papeletas >= 0 && max > papeletas) avisos.push('Un candidato tiene más votos que papeletas válidas');
+    if (papeletas >= 0 && suma > 3 * papeletas) avisos.push(`Más votos de los posibles (máx. 3 por papeleta: ${3 * papeletas})`);
+    if (papeletas > 0 && suma < papeletas) avisos.push('Menos votos que papeletas válidas');
+    a.cuadra = avisos.length === 0;
+  } else {
+    const total = suma + a.blancos + a.nulos;
+    a.validos = suma + a.blancos;
+    a.diferencia = a.votantes - total; // >0 faltan votos, <0 sobran
+    a.cuadra = a.diferencia === 0;
+    if (!a.cuadra) avisos.push(a.diferencia > 0 ? `Faltan ${a.diferencia} votos` : `Sobran ${-a.diferencia} votos`);
+  }
   if (a.censo && a.votantes > a.censo) avisos.push('Más votantes que electores');
-  const m = mesasIndex.get(a.id);
+  const m = mesasIndex.get(mesaKey(a));
   if (m && toInt(m.electores) && a.censo && toInt(m.electores) !== a.censo) avisos.push(`Censo distinto al oficial (${m.electores})`);
   if (mesas.length && !m) avisos.push('Mesa no está en el listado');
   const ds = SECCIONES[a.provincia]?.[a.municipio];
-  if (ds && !m && !(ds[a.distrito] || []).includes(a.seccion)) avisos.push('Distrito/sección no está en el listado del INE');
+  if (ds && !m && !(ds[a.distrito] || []).includes(a.seccion) && !MESAS23[a.provincia]?.[a.municipio]?.[a.distrito + '|' + a.seccion]) avisos.push('Distrito/sección no está en el listado oficial');
+  const l23 = MESAS23[a.provincia]?.[a.municipio]?.[a.distrito + '|' + a.seccion];
+  if (l23 && !m && !l23.includes(a.mesa)) avisos.push(`Mesa ${a.mesa} no existía en 2023 (había ${l23.split('').join(', ')})`);
   if (Object.keys(MUNICIPIOS).length && !municipioOficial(a.provincia, a.municipio) && !m) avisos.push('Municipio no reconocido');
   if (a.conflicto) avisos.push('Hay otra versión distinta del acta');
   if (a.observaciones) avisos.push('Tiene observaciones');
@@ -286,10 +706,11 @@ function guardarActa(body, user) {
     const mo = municipioOficial(provincia, ubic.municipio);
     if (mo) ubic.municipio = mo; // nombre oficial del INE
   }
-  const id = mesaKey(ubic);
+  const tipo = body.tipo === 'senado' ? 'senado' : 'congreso';
+  const id = (tipo === 'senado' ? 'senado|' : '') + mesaKey(ubic);
   const v = body.votos || {};
   const votos = {};
-  for (const p of config.partidos) votos[p.id] = !sePresenta(p, provincia) ? 0 : (toInt(v.partidos?.[p.id]) ?? 0);
+  for (const k of clavesVoto(tipo, provincia)) votos[k] = toInt(v.partidos?.[k]) ?? 0;
   const datos = {
     censo: toInt(v.censo) ?? 0,
     votantes: toInt(v.votantes) ?? 0,
@@ -311,7 +732,7 @@ function guardarActa(body, user) {
   }
 
   const acta = {
-    id, ...ubic, colegio, ...datos,
+    id, tipo, ...ubic, colegio, ...datos,
     observaciones: String(body.observaciones || '').slice(0, 2000).trim(),
     foto: foto || previa?.foto || null,
     enviadoPor: { nombre: user.nombre, dispositivo: user.dispositivo },
@@ -325,7 +746,7 @@ function guardarActa(body, user) {
     const { historial, ...anterior } = previa;
     acta.historial = [...(historial || []), anterior];
     const mismos = ['censo', 'votantes', 'nulos', 'blancos'].every((k) => anterior[k] === acta[k]) &&
-      config.partidos.every((p) => (anterior.votos?.[p.id] ?? 0) === acta.votos[p.id]);
+      Object.keys({ ...anterior.votos, ...acta.votos }).every((k) => (anterior.votos?.[k] ?? 0) === (acta.votos[k] ?? 0));
     acta.conflicto = previa.conflicto || !mismos;
   }
   calcula(acta);
@@ -349,10 +770,11 @@ function aPapelera(lista) {
 
 function resumen() {
   const lista = [...actas.values()];
-  const tot = { actas: lista.length, mesasTotal: mesas.length, censo: 0, votantes: 0, nulos: 0, blancos: 0, validos: 0, incidencias: 0, votos: {} };
+  const tot = { actas: lista.length, mesasTotal: contarMesas(), censo: 0, votantes: 0, nulos: 0, blancos: 0, validos: 0, incidencias: 0, votos: {} };
   const porMunicipio = {};
   for (const p of config.partidos) tot.votos[p.id] = 0;
   for (const a of lista) {
+    if (a.tipo === 'senado') { if (a.incidencia && !a.revisada) tot.incidencias++; continue; }
     tot.censo += a.censo; tot.votantes += a.votantes; tot.nulos += a.nulos; tot.blancos += a.blancos; tot.validos += a.validos;
     if (a.incidencia && !a.revisada) tot.incidencias++;
     const k = norm(a.provincia) + '|' + norm(a.municipio);
@@ -363,10 +785,7 @@ function resumen() {
       m.votos[p.id] = (m.votos[p.id] || 0) + (a.votos[p.id] || 0);
     }
   }
-  for (const me of mesas) {
-    const m = porMunicipio[norm(me.provincia) + '|' + norm(me.municipio)];
-    if (m) m.mesasTotal++;
-  }
+  for (const m of Object.values(porMunicipio)) m.mesasTotal = contarMesas(m.provincia, m.municipio);
   return {
     config, totales: tot,
     municipios: Object.values(porMunicipio).sort((a, b) => b.censo - a.censo),
@@ -384,10 +803,26 @@ function municipioOficial(prov, nombre) { return indiceMun.get(prov + '|' + clav
 
 // Secciones censales oficiales de Catalunya (INE 2025): { provincia: { municipio: { distrito: [secciones] } } }.
 const SECCIONES = readJSON(path.join(__dirname, 'secciones.json'), {});
+// Mesas oficiales de las Generales 2023 (Ministerio del Interior): { provincia: { municipio: { 'distrito|seccion': 'AB' } } }.
+const MESAS23 = readJSON(path.join(__dirname, 'mesas-2023.json'), {});
+// Nº de mesas (para el % escrutado): listado cargado en el panel si lo hay; si no, el oficial de 2023.
+function contarMesas(prov, mun) {
+  if (mesas.length) return mesas.filter((m) => (!prov || norm(m.provincia) === norm(prov)) && (!mun || norm(m.municipio) === norm(mun))).length;
+  let n = 0;
+  for (const p in MESAS23) if (!prov || p === prov) for (const mu in MESAS23[p]) if (!mun || mu === mun) for (const l of Object.values(MESAS23[p][mu])) n += l.length;
+  return n;
+}
 // Secciones + letras de mesa: las del INE, ampliadas con el listado de mesas que se cargue desde el panel.
 function seccionesConfig() {
   const secc = JSON.parse(JSON.stringify(SECCIONES));
   const letras = {};
+  for (const p in MESAS23) for (const mun in MESAS23[p]) for (const [ds, l] of Object.entries(MESAS23[p][mun])) {
+    const [d, s] = ds.split('|');
+    const lista = ((secc[p] ||= {})[mun] ||= {})[d] ||= [];
+    if (!lista.includes(s)) { lista.push(s); lista.sort(); }
+    letras[[p, mun, d, s].join('|')] = l.split('');
+  }
+  const subidas = new Set();
   for (const m of mesas) {
     const p = PROVINCIAS.find((x) => norm(x) === norm(m.provincia));
     if (!p) continue;
@@ -396,7 +831,8 @@ function seccionesConfig() {
     const lista = ((secc[p] ||= {})[mun] ||= {})[d] ||= [];
     if (!lista.includes(s)) { lista.push(s); lista.sort(); }
     const k = [p, mun, d, s].join('|');
-    (letras[k] ||= []).includes(m.mesa) || letras[k].push(m.mesa);
+    if (!subidas.has(k)) { letras[k] = []; subidas.add(k); } // el listado del panel sustituye al de 2023
+    letras[k].includes(m.mesa) || letras[k].push(m.mesa);
   }
   for (const k in letras) letras[k].sort((a, b) => (a === 'U' ? -1 : b === 'U' ? 1 : a.localeCompare(b)));
   return { secciones: secc, letras };
@@ -435,7 +871,7 @@ async function handle(req, res) {
   const dispositivo = String(req.headers['x-dispositivo'] || '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 64);
   if (p === '/api/config' && m === 'GET') {
     cacheSecc ||= seccionesConfig();
-    return send(res, 200, { eleccion: config.eleccion, partidos: config.partidos, provincias: PROVINCIAS, municipios: municipiosConfig(), ...cacheSecc, hayListadoMesas: mesas.length > 0 });
+    return send(res, 200, { eleccion: config.eleccion, partidos: config.partidos, senado: config.senado, provincias: PROVINCIAS, municipios: municipiosConfig(), ...cacheSecc, hayListadoMesas: mesas.length > 0 });
   }
   if (p === '/api/mesas' && m === 'GET') {
     const prov = norm(url.searchParams.get('provincia')), mun = norm(url.searchParams.get('municipio'));
@@ -497,14 +933,19 @@ async function handle(req, res) {
       return fs.createReadStream(file).pipe(res);
     }
     if (p === '/api/admin/export.csv' && m === 'GET') {
-      const cols = ['provincia', 'municipio', 'colegio', 'distrito', 'seccion', 'mesa', 'censo', 'votantes', 'nulos', 'blancos', ...config.partidos.map((x) => x.nombre), 'cuadra', 'avisos', 'observaciones', 'enviado_por', 'dispositivo', 'recibido'];
+      const senado = url.searchParams.get('tipo') === 'senado';
+      const claves = senado
+        ? PROVINCIAS.flatMap((pr) => (config.senado[pr] || []).map((c) => ({ id: c.id, titulo: `${c.nombre} (${c.partido}, ${pr})` })))
+        : config.partidos.map((x) => ({ id: x.id, titulo: x.nombre }));
+      const cols = ['provincia', 'municipio', 'colegio', 'distrito', 'seccion', 'mesa', 'censo', 'votantes', 'nulos', 'blancos', ...claves.map((c) => c.titulo), 'correcta', 'avisos', 'observaciones', 'enviado_por', 'dispositivo', 'recibido'];
       const lines = [cols.map(csvCell).join(';')];
-      for (const a of [...actas.values()].sort((x, y) => x.id.localeCompare(y.id))) {
+      for (const a of [...actas.values()].filter((x) => (x.tipo === 'senado') === senado).sort((x, y) => x.id.localeCompare(y.id))) {
         lines.push([a.provincia, a.municipio, a.colegio, a.distrito, a.seccion, a.mesa, a.censo, a.votantes, a.nulos, a.blancos,
-          ...config.partidos.map((x) => a.votos[x.id] ?? 0), a.cuadra ? 'SI' : 'NO', a.avisos.join(' | '), a.observaciones,
+          ...claves.map((c) => a.votos[c.id] ?? ''), a.cuadra ? 'SI' : 'NO', a.avisos.join(' | '), a.observaciones,
           a.enviadoPor?.nombre, a.enviadoPor?.dispositivo?.slice(0, 8), a.recibido].map(csvCell).join(';'));
       }
-      return send(res, 200, '﻿' + lines.join('\r\n'), { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="actas.csv"' });
+      const nombre = senado ? 'actas-senado.csv' : 'actas-congreso.csv';
+      return send(res, 200, '\uFEFF' + lines.join('\r\n'), { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${nombre}"` });
     }
     if (p === '/api/admin/config' && m === 'GET') {
       return send(res, 200, { config, mesas: mesas.length });
@@ -518,7 +959,19 @@ async function handle(req, res) {
       })).filter((x) => x.id && x.nombre);
       if (!partidos.length) return send(res, 400, { error: 'Hace falta al menos un partido' });
       if (new Set(partidos.map((x) => x.id)).size !== partidos.length) return send(res, 400, { error: 'Hay partidos repetidos' });
-      config = { eleccion: String(b.eleccion || config.eleccion).trim(), partidos };
+      let senado = config.senado;
+      if (Array.isArray(b.senado)) {
+        senado = Object.fromEntries(PROVINCIAS.map((pr) => [pr, []]));
+        for (const c of b.senado) {
+          const pr = PROVINCIAS.find((q) => norm(q) === norm(c.provincia));
+          const nombre = String(c.nombre || '').trim(), partido = String(c.partido || '').trim();
+          if (!pr || !nombre) continue;
+          const previo = (config.senado[pr] || []).find((x) => x.nombre === nombre);
+          const id = previo?.id || (partido + '-' + nombre).toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+          senado[pr].push({ id, nombre, partido, color: /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : (partidos.find((x) => norm(x.nombre) === norm(partido))?.color || '#888888') });
+        }
+      }
+      config = { eleccion: String(b.eleccion || config.eleccion).trim(), partidos, senado };
       writeJSON(configFile, config);
       return send(res, 200, { ok: true, config });
     }

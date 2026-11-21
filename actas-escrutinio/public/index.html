@@ -70,6 +70,13 @@
     <div class="steps"><span class="on"></span><span></span></div>
     <p class="muted">Comprueba que la mesa coincide con lo que pone en el acta.</p>
     <div class="card">
+      <h2>📄 ¿Qué acta es?</h2>
+      <div class="tipo">
+        <button type="button" class="tipo-btn" data-tipo="congreso"><b>Congreso</b><small>Papeleta blanca</small></button>
+        <button type="button" class="tipo-btn" data-tipo="senado"><b>Senado</b><small>Papeleta sepia</small></button>
+      </div>
+    </div>
+    <div class="card">
       <h2 style="margin-bottom:0">🙋 Tus datos</h2>
       <label for="u-nombre">Tu nombre y apellido *</label>
       <input id="u-nombre" required placeholder="Nombre y apellido" autocomplete="name">
@@ -99,7 +106,7 @@
 
   <!-- PASO 2: VOTOS -->
   <section id="s-votos" class="screen">
-    <div class="topbar"><button class="btn ghost small" data-back="s-ubic">← Volver</button><div class="title">Paso 2 de 2 · Votos</div></div>
+    <div class="topbar"><button class="btn ghost small" data-back="s-ubic">← Volver</button><div class="title">Paso 2 de 2 · Votos <span id="v-tipo" class="badge"></span></div></div>
     <div class="steps"><span class="on"></span><span class="on"></span></div>
 
     <div class="card row">
@@ -115,13 +122,14 @@
       <div class="grid2">
         <div><label for="v-censo">Electores (censo)</label><input id="v-censo" inputmode="numeric" pattern="[0-9]*"></div>
         <div><label for="v-votantes">Total votantes</label><input id="v-votantes" inputmode="numeric" pattern="[0-9]*"></div>
-        <div><label for="v-nulos">Votos nulos</label><input id="v-nulos" inputmode="numeric" pattern="[0-9]*"></div>
-        <div><label for="v-blancos">Votos en blanco</label><input id="v-blancos" inputmode="numeric" pattern="[0-9]*"></div>
+        <div><label for="v-nulos" id="l-nulos">Votos nulos</label><input id="v-nulos" inputmode="numeric" pattern="[0-9]*"></div>
+        <div><label for="v-blancos" id="l-blancos">Votos en blanco</label><input id="v-blancos" inputmode="numeric" pattern="[0-9]*"></div>
       </div>
     </div>
 
     <div class="card">
-      <h2>🗳️ Votos por partido</h2>
+      <h2 id="v-titulo">🗳️ Votos por partido</h2>
+      <p id="v-ayuda" class="muted hidden" style="margin-top:-6px">Escribe los votos de <b>cada candidato</b>, tal como aparecen en el acta.</p>
       <div id="v-partidos" class="grid2"></div>
     </div>
 

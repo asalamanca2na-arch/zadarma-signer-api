@@ -45,29 +45,44 @@ async function refrescar() {
   try { datos = await api('/api/admin/resumen'); pintar(); }
   catch (e) { $('p-upd').textContent = '⚠ ' + e.message; }
 }
+// Congreso o Senado: todo el panel (resultados, actas y exportación) muestra un solo tipo de acta.
+let tipo = 'congreso';
+document.querySelectorAll('[data-tipo]').forEach((b) => b.addEventListener('click', () => {
+  tipo = b.dataset.tipo;
+  document.querySelectorAll('[data-tipo]').forEach((x) => x.classList.toggle('on', x === b));
+  if (datos) pintar();
+}));
+const tipoDe = (a) => (a.tipo === 'senado' ? 'senado' : 'congreso');
 function filtradas() {
   const prov = $('f-prov').value, mun = norm($('f-mun').value);
-  return datos.actas.filter((a) => (!prov || a.provincia === prov) && (!mun || norm(a.municipio) === mun));
+  return datos.actas.filter((a) => tipoDe(a) === tipo && (!prov || a.provincia === prov) && (!mun || norm(a.municipio) === mun));
+}
+// Lo que se vota: candidaturas (Congreso) o candidatos de cada provincia (Senado).
+function claves(config, prov) {
+  if (tipo === 'senado') return (prov ? [prov] : Object.keys(config.senado || {})).flatMap((p) => (config.senado[p] || []).map((c) => ({ ...c, provincia: p, etiqueta: c.nombre, sub: c.partido })));
+  return config.partidos.map((p) => ({ ...p, etiqueta: p.nombre, sub: '' }));
 }
 function pintar() {
   const { config } = datos;
   $('p-eleccion').textContent = config.eleccion;
   $('p-upd').textContent = 'Actualizado ' + new Date(datos.actualizado).toLocaleTimeString('es-ES');
-  $('b-csv').href = '/api/admin/export.csv?t=' + encodeURIComponent(token);
+  $('b-csv').href = `/api/admin/export.csv?tipo=${tipo}&t=` + encodeURIComponent(token);
+  $('b-csv').textContent = `⬇ Exportar CSV (${tipo === 'senado' ? 'Senado' : 'Congreso'})`;
 
   // filtros
   const provs = ['Barcelona', 'Girona', 'Lleida', 'Tarragona'];
   if ($('f-prov').options.length === 1) provs.forEach((p) => $('f-prov').insertAdjacentHTML('beforeend', `<option>${p}</option>`));
+  const K = claves(config, $('f-prov').value);
   const muns = [...new Set(datos.actas.filter((a) => !$('f-prov').value || a.provincia === $('f-prov').value).map((a) => a.municipio))].sort();
   $('dl-mun').innerHTML = muns.map((m) => `<option value="${esc(m)}">`).join('');
 
   const L = filtradas();
   const t = { censo: 0, votantes: 0, nulos: 0, blancos: 0, validos: 0, inc: 0, votos: {} };
-  config.partidos.forEach((p) => (t.votos[p.id] = 0));
+  K.forEach((p) => (t.votos[p.id] = 0));
   for (const a of L) {
     t.censo += a.censo; t.votantes += a.votantes; t.nulos += a.nulos; t.blancos += a.blancos; t.validos += a.validos;
     if (a.incidencia && !a.revisada) t.inc++;
-    config.partidos.forEach((p) => (t.votos[p.id] += a.votos[p.id] || 0));
+    K.forEach((p) => (t.votos[p.id] += a.votos[p.id] || 0));
   }
   const filtro = $('f-prov').value || $('f-mun').value;
   const mesasTot = filtro ? datos.municipios.filter((m) => (!$('f-prov').value || m.provincia === $('f-prov').value) && (!$('f-mun').value || norm(m.municipio) === norm($('f-mun').value))).reduce((s, m) => s + m.mesasTotal, 0) : datos.totales.mesasTotal;
@@ -76,16 +91,30 @@ function pintar() {
     [fmt(L.length) + (mesasTot ? ` <span class="muted" style="font-size:1rem">/ ${fmt(mesasTot)}</span>` : ''), 'Actas recibidas' + (mesasTot ? ' · ' + pct(L.length, mesasTot) + ' escrutado' : '')],
     [pct(t.votantes, t.censo), 'Participación en esas mesas'],
     [fmt(t.votantes), 'Votantes'],
-    [fmt(t.nulos) + ' / ' + fmt(t.blancos), 'Nulos / Blancos'],
+    [fmt(t.nulos) + ' / ' + fmt(t.blancos), tipo === 'senado' ? 'Papeletas nulas / en blanco' : 'Nulos / Blancos'],
     [fmt(t.inc), 'Incidencias sin revisar', t.inc > 0],
   ].map(([v, l, al]) => `<div class="kpi${al ? ' alert' : ''}"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
   $('tab-inc').textContent = datos.totales.incidencias ? `(${datos.totales.incidencias})` : '';
 
-  const orden = [...config.partidos].sort((a, b) => t.votos[b.id] - t.votos[a.id]);
-  const max = Math.max(1, ...orden.map((p) => t.votos[p.id]));
-  $('bars').innerHTML = orden.map((p) => `<div class="bar"><div class="party"><span class="dot" style="background:${esc(p.color)}"></span><b>${esc(p.nombre)}</b></div>
+  const barra = (p, max, total, extra = '') => `<div class="bar"><div class="party"><span class="dot" style="background:${esc(p.color)}"></span><div><b>${esc(p.etiqueta)}</b>${p.sub ? `<br><span class="muted" style="font-size:.8rem">${esc(p.sub)}</span>` : ''}${extra}</div></div>
     <div class="track"><div class="fill" style="width:${(t.votos[p.id] / max) * 100}%;background:${esc(p.color)}"></div></div>
-    <div class="num"><b>${pct(t.votos[p.id], t.validos)}</b> · ${fmt(t.votos[p.id])}</div></div>`).join('') || '<p class="muted">Sin datos todavía.</p>';
+    <div class="num">${total ? `<b>${pct(t.votos[p.id], total)}</b> · ` : ''}${fmt(t.votos[p.id])}</div></div>`;
+  if (tipo === 'senado') {
+    // Cada provincia elige 4 senadores: los 4 candidatos más votados (resultado provisional con las actas recibidas).
+    $('h-bars').innerHTML = 'Votos a candidatos al Senado <span class="muted" style="font-weight:400">· los 4 más votados de cada provincia salen elegidos</span>';
+    const provs = $('f-prov').value ? [$('f-prov').value] : Object.keys(config.senado || {});
+    $('bars').innerHTML = provs.map((pr) => {
+      const lista = K.filter((c) => c.provincia === pr).sort((a, b) => t.votos[b.id] - t.votos[a.id]);
+      const max = Math.max(1, ...lista.map((c) => t.votos[c.id]));
+      const hay = lista.some((c) => t.votos[c.id] > 0);
+      return `<h3 style="margin:14px 0 6px">${esc(pr)}</h3>` + lista.map((c, i) => barra(c, max, 0, hay && i < 4 ? ' <span class="pill ok">Escaño</span>' : '')).join('');
+    }).join('');
+  } else {
+    $('h-bars').innerHTML = 'Votos por candidatura <span class="muted" style="font-weight:400">· % sobre votos válidos (incluye blancos)</span>';
+    const orden = [...K].sort((a, b) => t.votos[b.id] - t.votos[a.id]);
+    const max = Math.max(1, ...orden.map((p) => t.votos[p.id]));
+    $('bars').innerHTML = orden.map((p) => barra(p, max, t.validos)).join('') || '<p class="muted">Sin datos todavía.</p>';
+  }
 
   // por municipio
   const ms = {};
@@ -93,13 +122,14 @@ function pintar() {
     const k = a.provincia + '|' + a.municipio;
     const m = ms[k] ||= { provincia: a.provincia, municipio: a.municipio, actas: 0, censo: 0, votantes: 0, validos: 0, votos: {} };
     m.actas++; m.censo += a.censo; m.votantes += a.votantes; m.validos += a.validos;
-    config.partidos.forEach((p) => (m.votos[p.id] = (m.votos[p.id] || 0) + (a.votos[p.id] || 0)));
+    K.forEach((p) => (m.votos[p.id] = (m.votos[p.id] || 0) + (a.votos[p.id] || 0)));
   }
   const totMesas = Object.fromEntries(datos.municipios.map((m) => [m.provincia + '|' + m.municipio, m.mesasTotal]));
-  $('t-mun').innerHTML = `<thead><tr><th>Municipio</th><th class="n">Actas</th><th class="n">Particip.</th>${config.partidos.map((p) => `<th class="n">${esc(p.nombre)}</th>`).join('')}</tr></thead><tbody>` +
+  const KM = tipo === 'senado' ? [] : K; // en el Senado la tabla por municipio solo muestra actas y participación
+  $('t-mun').innerHTML = `<thead><tr><th>Municipio</th><th class="n">Actas</th><th class="n">Particip.</th>${KM.map((p) => `<th class="n">${esc(p.nombre)}</th>`).join('')}</tr></thead><tbody>` +
     Object.values(ms).sort((a, b) => b.votantes - a.votantes).map((m) => `<tr data-mun="${esc(m.municipio)}" data-prov="${esc(m.provincia)}"><td><b>${esc(m.municipio)}</b> <span class="muted">${esc(m.provincia)}</span></td>
       <td class="n">${m.actas}${totMesas[m.provincia + '|' + m.municipio] ? ' / ' + totMesas[m.provincia + '|' + m.municipio] : ''}</td><td class="n">${pct(m.votantes, m.censo)}</td>
-      ${config.partidos.map((p) => `<td class="n">${fmt(m.votos[p.id])}<br><span class="muted">${pct(m.votos[p.id], m.validos)}</span></td>`).join('')}</tr>`).join('') + '</tbody>';
+      ${KM.map((p) => `<td class="n">${fmt(m.votos[p.id])}<br><span class="muted">${pct(m.votos[p.id], m.validos)}</span></td>`).join('')}</tr>`).join('') + '</tbody>';
   $('t-mun').querySelectorAll('tr[data-mun]').forEach((tr) => tr.addEventListener('click', () => { $('f-prov').value = tr.dataset.prov; $('f-mun').value = tr.dataset.mun; pintar(); }));
 
   pintarActas(L);
@@ -123,24 +153,25 @@ function pintarActas(L) {
 ['f-q', 'f-inc'].forEach((id) => $(id).addEventListener('input', () => datos && pintarActas(filtradas())));
 
 // ---------- detalle de acta ----------
-function tablaVotos(a, partidos) {
-  const filas = [['Electores (censo)', a.censo], ['Votantes', a.votantes], ['Nulos', a.nulos], ['Blancos', a.blancos], ...partidos.map((p) => [p.nombre, a.votos?.[p.id] ?? 0])];
+function tablaVotos(a) {
+  const sen = a.tipo === 'senado';
+  const lista = sen ? (datos.config.senado?.[a.provincia] || []).map((c) => [`${c.nombre} (${c.partido})`, c.id]) : datos.config.partidos.filter((p) => a.votos && p.id in a.votos).map((p) => [p.nombre, p.id]);
+  const filas = [['Electores (censo)', a.censo], ['Votantes', a.votantes], [sen ? 'Papeletas nulas' : 'Nulos', a.nulos], [sen ? 'Papeletas en blanco' : 'Blancos', a.blancos], ...lista.map(([k, id]) => [k, a.votos?.[id] ?? 0])];
   return `<table>${filas.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n"><b>${fmt(v)}</b></td></tr>`).join('')}</table>`;
 }
 async function verActa(id) {
   const a = await api('/api/admin/acta?id=' + encodeURIComponent(id));
-  const P = datos.config.partidos;
   const box = $('modal-box');
-  box.innerHTML = `<div class="topbar"><div class="title"><h2 style="margin:0">${esc(a.municipio)} · ${esc(a.colegio)} · Dist. ${esc(a.distrito)} · Secc. ${esc(a.seccion)} · Mesa ${esc(a.mesa)}</h2></div><button class="btn ghost small" id="m-close">✕</button></div>
+  box.innerHTML = `<div class="topbar"><div class="title"><h2 style="margin:0"><span class="badge">${a.tipo === 'senado' ? 'Senado' : 'Congreso'}</span> ${esc(a.municipio)} · ${esc(a.colegio)} · Dist. ${esc(a.distrito)} · Secc. ${esc(a.seccion)} · Mesa ${esc(a.mesa)}</h2></div><button class="btn ghost small" id="m-close">✕</button></div>
     <div class="detail">
       <div>${a.foto ? `<a href="/api/admin/foto?f=${encodeURIComponent(a.foto)}&t=${encodeURIComponent(token)}" target="_blank"><img src="/api/admin/foto?f=${encodeURIComponent(a.foto)}&t=${encodeURIComponent(token)}" alt="Acta"></a><p class="muted">Pulsa la foto para abrirla en grande.</p>` : '<p class="warn">Enviada sin foto.</p>'}</div>
       <div>
-        <div class="status ${a.cuadra ? 'ok' : 'bad'}">${a.cuadra ? '✓ Los votos cuadran' : '⚠ ' + (a.diferencia > 0 ? `Faltan ${a.diferencia} votos` : `Sobran ${-a.diferencia} votos`)}</div>
+        <div class="status ${a.cuadra ? 'ok' : 'bad'}">${a.cuadra ? (a.tipo === 'senado' ? '✓ Datos coherentes' : '✓ Los votos cuadran') : '⚠ ' + (a.tipo === 'senado' ? esc(a.avisos[0] || '') : a.diferencia > 0 ? `Faltan ${a.diferencia} votos` : `Sobran ${-a.diferencia} votos`)}</div>
         ${(a.avisos || []).length ? `<p class="warn" style="margin-top:10px">${a.avisos.map(esc).join('<br>')}</p>` : ''}
         ${a.observaciones ? `<p><b>Observaciones:</b> ${esc(a.observaciones)}</p>` : ''}
-        ${tablaVotos(a, P)}
+        ${tablaVotos(a)}
         <p class="muted">Enviada por ${esc(a.enviadoPor?.nombre || 'Sin nombre')} · ${new Date(a.recibido).toLocaleString('es-ES')}</p>
-        ${(a.historial || []).length ? `<details><summary><b>${a.historial.length} versión(es) anterior(es)</b></summary>${a.historial.map((h) => `<div class="card" style="background:#f6f8fb"><div class="muted">${esc(h.enviadoPor?.nombre)} · ${new Date(h.recibido).toLocaleString('es-ES')}</div>${tablaVotos(h, P)}</div>`).join('')}</details>` : ''}
+        ${(a.historial || []).length ? `<details><summary><b>${a.historial.length} versión(es) anterior(es)</b></summary>${a.historial.map((h) => `<div class="card" style="background:#f6f8fb"><div class="muted">${esc(h.enviadoPor?.nombre)} · ${new Date(h.recibido).toLocaleString('es-ES')}</div>${tablaVotos({ ...h, tipo: a.tipo, provincia: a.provincia })}</div>`).join('')}</details>` : ''}
         <div style="height:10px"></div>
         <button class="btn danger" id="m-del" style="margin-bottom:10px">🗑 Borrar esta acta</button>
         <button class="btn ${a.revisada ? 'secondary' : ''}" id="m-rev">${a.revisada ? 'Quitar marca de revisada' : '✓ Marcar como revisada'}</button>
@@ -165,6 +196,7 @@ async function cargarConfig() {
   const c = await api('/api/admin/config');
   $('c-eleccion').value = c.config.eleccion;
   $('c-partidos').value = c.config.partidos.map((p) => `${p.nombre};${p.color}` + (p.orden && Object.keys(p.orden).length ? ';' + Object.entries(p.orden).map(([k, v]) => k + ':' + v).join(',') : '')).join('\n');
+  $('c-senado').value = Object.entries(c.config.senado || {}).flatMap(([pr, l]) => l.map((x) => `${pr};${x.partido};${x.nombre}`)).join('\n');
   $('c-nmesas').textContent = c.mesas ? `(${fmt(c.mesas)} mesas cargadas)` : '(no cargado)';
 }
 $('b-conf').addEventListener('click', async () => {
@@ -176,7 +208,12 @@ $('b-conf').addEventListener('click', async () => {
     return { id: previo?.id || nombre, nombre, color, orden };
   });
   try {
-    await api('/api/admin/config', { method: 'PUT', body: { eleccion: $('c-eleccion').value, partidos } });
+    const senado = $('c-senado').value.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => {
+      const [provincia, partido, nombre] = l.split(';').map((x) => x.trim());
+      const color = datos?.config.senado?.[provincia]?.find((x) => x.partido === partido)?.color;
+      return { provincia, partido, nombre, color };
+    });
+    await api('/api/admin/config', { method: 'PUT', body: { eleccion: $('c-eleccion').value, partidos, senado } });
     $('c-msg').textContent = '✓ Guardado'; refrescar();
   } catch (e) { $('c-msg').textContent = '⚠ ' + e.message; }
 });

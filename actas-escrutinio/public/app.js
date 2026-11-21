@@ -98,8 +98,8 @@ async function pintarInicio() {
   let enviadas = store.get('mis-actas', []);
   try { enviadas = await api('/api/mis-actas'); store.set('mis-actas', enviadas); } catch {}
   const items = [
-    ...pend.map((p) => `<li><div class="grow"><b>${esc(p.ubicacion.municipio)}</b><div class="muted">Dist. ${esc(p.ubicacion.distrito)} · Secc. ${esc(p.ubicacion.seccion)} · Mesa ${esc(p.ubicacion.mesa)}</div></div><span class="pill wait">Pendiente</span></li>`),
-    ...enviadas.sort((a, b) => b.recibido.localeCompare(a.recibido)).map((a) => `<li><div class="grow"><b>${esc(a.municipio)}</b><div class="muted">Dist. ${esc(a.distrito)} · Secc. ${esc(a.seccion)} · Mesa ${esc(a.mesa)} · ${new Date(a.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</div></div><span class="pill ${a.cuadra ? 'ok' : 'bad'}">${a.cuadra ? 'Enviada' : 'Enviada · revisar'}</span></li>`),
+    ...pend.map((p) => `<li><div class="grow"><b>${nombreTipo(p.tipo)} · ${esc(p.ubicacion.municipio)}</b><div class="muted">Dist. ${esc(p.ubicacion.distrito)} · Secc. ${esc(p.ubicacion.seccion)} · Mesa ${esc(p.ubicacion.mesa)}</div></div><span class="pill wait">Pendiente</span></li>`),
+    ...enviadas.sort((a, b) => b.recibido.localeCompare(a.recibido)).map((a) => `<li><div class="grow"><b>${nombreTipo(a.tipo)} · ${esc(a.municipio)}</b><div class="muted">Dist. ${esc(a.distrito)} · Secc. ${esc(a.seccion)} · Mesa ${esc(a.mesa)} · ${new Date(a.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</div></div><span class="pill ${a.cuadra ? 'ok' : 'bad'}">${a.cuadra ? 'Enviada' : 'Enviada · revisar'}</span></li>`),
   ];
   $('h-lista').innerHTML = items.join('') || '<li class="muted">Todavía no has enviado ninguna.</li>';
 }
@@ -182,10 +182,15 @@ async function irUbicacion() {
   if (ult.seccion && [...$('u-secc').options].some((o) => o.value === ult.seccion)) { $('u-secc').value = ult.seccion; alCambiarSecc(); }
   if (ult.mesa && [...$('u-mesa').options].some((o) => o.value === ult.mesa)) $('u-mesa').value = ult.mesa;
   $('u-err').classList.add('hidden');
+  marcarTipo();
   $('u-nombre').value = store.get('nombre', '');
   $('u-colegio').value = store.get('colegio', '');
   show('s-ubic');
 }
+// Congreso o Senado: se elige cada vez (el apoderado suele enviar las dos actas de la mesa).
+function marcarTipo() { document.querySelectorAll('.tipo-btn').forEach((b) => b.classList.toggle('on', b.dataset.tipo === borrador?.tipo)); }
+document.querySelectorAll('.tipo-btn').forEach((b) => b.addEventListener('click', () => { borrador.tipo = b.dataset.tipo; marcarTipo(); $('u-err').classList.add('hidden'); }));
+const nombreTipo = (t) => (t === 'senado' ? 'Senado' : 'Congreso');
 $('b-ubic-back').addEventListener('click', () => show(borrador?.foto ? 's-foto' : 's-home'));
 
 // ---- desplegables en cascada: provincia → municipio → distrito → sección → mesa ----
@@ -211,13 +216,20 @@ function alCambiarDist() {
   alCambiarSecc();
 }
 function letrasMesa(prov, mun, dist, secc) {
-  return cfg.letras?.[[prov, mun, dist, secc].join('|')] || ['U', 'A', 'B', 'C', 'D', 'E'];
+  return cfg.letras?.[[prov, mun, dist, secc].join('|')] || TODAS_LETRAS;
 }
+const TODAS_LETRAS = ['U', 'A', 'B', 'C', 'D', 'E'];
 function alCambiarSecc() {
   const listo = modo === 'manual' ? !!$('u-mun').value : !!$('u-secc').value;
-  const letras = listo ? letrasMesa($('u-prov').value, $('u-mun').value, $('u-dist').value, $('u-secc').value) : [];
+  const letras = !listo ? [] : modo === 'manual' ? TODAS_LETRAS : letrasMesa($('u-prov').value, $('u-mun').value, $('u-dist').value, $('u-secc').value);
   opciones($('u-mesa'), letras, listo ? 'Mesa' : '—');
+  // Las mesas oficiales son de 2023: si la del acta no aparece, se puede elegir otra letra.
+  if (listo && modo !== 'manual' && letras.length < TODAS_LETRAS.length) $('u-mesa').insertAdjacentHTML('beforeend', '<option value="__otra">Otra…</option>');
 }
+$('u-mesa').addEventListener('change', () => {
+  if ($('u-mesa').value !== '__otra') return;
+  opciones($('u-mesa'), TODAS_LETRAS, 'Mesa');
+});
 $('u-prov').addEventListener('change', alCambiarProv);
 $('u-mun').addEventListener('change', alCambiarMun);
 $('u-dist').addEventListener('change', alCambiarDist);
@@ -238,6 +250,7 @@ $('b-manual').addEventListener('click', () => modoManual(modo !== 'manual'));
 
 $('b-ubic-ok').addEventListener('click', () => {
   const err = (t) => { $('u-err').textContent = t; $('u-err').classList.remove('hidden'); };
+  if (!borrador.tipo) return err('Elige arriba si el acta es del Congreso o del Senado.');
   const nombre = $('u-nombre').value.trim(), colegio = $('u-colegio').value.trim();
   if (nombre.length < 3) return err('Escribe tu nombre y apellido.');
   if (colegio.length < 3) return err('Escribe el nombre del colegio electoral.');
@@ -249,7 +262,7 @@ $('b-ubic-ok').addEventListener('click', () => {
   const seccion = modo === 'manual' ? $('u-secc-m').value.trim() : $('u-secc').value;
   if (!distrito) return err('Elige el distrito.');
   if (!seccion) return err('Elige la sección.');
-  if (!$('u-mesa').value) return err('Elige la mesa.');
+  if (!$('u-mesa').value || $('u-mesa').value === '__otra') return err('Elige la mesa.');
   const u = { provincia: prov, municipio: mun, distrito: distrito.padStart(2, '0'), seccion: seccion.padStart(3, '0'), mesa: $('u-mesa').value };
   u.colegio = colegio;
   borrador.ubicacion = u; borrador.nombre = nombre;
@@ -263,6 +276,8 @@ $('b-ubic-ok').addEventListener('click', () => {
 const partidosDe = (prov) => cfg.partidos
   .filter((p) => !p.orden || !Object.keys(p.orden).length || p.orden[prov] != null)
   .map((p, i) => ({ p, k: p.orden?.[prov] ?? 1000 + i })).sort((a, b) => a.k - b.k).map((x) => x.p);
+// Lo que se vota en el acta: candidaturas (Congreso) o candidatos de la provincia (Senado).
+const listaVotos = (tipo, prov) => (tipo === 'senado' ? cfg.senado?.[prov] || [] : partidosDe(prov));
 const numIds = ['v-censo', 'v-votantes', 'v-nulos', 'v-blancos'];
 function irVotos() {
   const u = borrador.ubicacion;
@@ -270,18 +285,36 @@ function irVotos() {
   $('v-mesa').textContent = `${u.colegio} · Distrito ${u.distrito} · Sección ${u.seccion} · Mesa ${u.mesa}`;
   $('v-thumb').classList.toggle('hidden', !borrador.foto);
   if (borrador.foto) $('v-thumb').src = borrador.foto;
-  const v = borrador.votos || {};
-  const hecho = u.provincia + JSON.stringify(cfg.partidos);
+  const v = (borrador.votos?.tipo === borrador.tipo ? borrador.votos : null) || {};
+  const senado = borrador.tipo === 'senado';
+  $('v-tipo').textContent = nombreTipo(borrador.tipo);
+  $('l-nulos').textContent = senado ? 'Papeletas nulas' : 'Votos nulos';
+  $('l-blancos').textContent = senado ? 'Papeletas en blanco' : 'Votos en blanco';
+  $('v-titulo').textContent = senado ? '🗳️ Votos a cada candidato' : '🗳️ Votos por partido';
+  $('v-ayuda').classList.toggle('hidden', !senado);
+  const hecho = borrador.tipo + u.provincia + JSON.stringify(senado ? cfg.senado : cfg.partidos);
   if ($('v-partidos').dataset.hecho !== hecho) {
-    $('v-partidos').innerHTML = partidosDe(u.provincia).map((p) => `<div><label for="p-${esc(p.id)}" class="party"><span class="dot" style="background:${esc(p.color)}"></span>${p.orden?.[u.provincia] ? p.orden[u.provincia] + '. ' : ''}${esc(p.nombre)}</label><input id="p-${esc(p.id)}" data-partido="${esc(p.id)}" inputmode="numeric" pattern="[0-9]*"></div>`).join('');
-    $('v-partidos').dataset.hecho = hecho;
-    $('v-partidos').querySelectorAll('input').forEach((i) => i.addEventListener('input', recalcular));
+    const caja = $('v-partidos');
+    if (senado) {
+      caja.className = '';
+      let partido = null;
+      caja.innerHTML = listaVotos('senado', u.provincia).map((c) => {
+        const cab = c.partido !== partido ? `<div class="grupo-partido"><span class="dot" style="background:${esc(c.color)}"></span>${esc(c.partido)}</div>` : '';
+        partido = c.partido;
+        return cab + `<div class="cand"><label for="p-${esc(c.id)}">${esc(c.nombre)}</label><input id="p-${esc(c.id)}" inputmode="numeric" pattern="[0-9]*"></div>`;
+      }).join('');
+    } else {
+      caja.className = 'grid2';
+      caja.innerHTML = listaVotos('congreso', u.provincia).map((p) => `<div><label for="p-${esc(p.id)}" class="party"><span class="dot" style="background:${esc(p.color)}"></span>${p.orden?.[u.provincia] ? p.orden[u.provincia] + '. ' : ''}${esc(p.nombre)}</label><input id="p-${esc(p.id)}" inputmode="numeric" pattern="[0-9]*"></div>`).join('');
+    }
+    caja.dataset.hecho = hecho;
+    caja.querySelectorAll('input').forEach((i) => i.addEventListener('input', recalcular));
   }
   $('v-censo').value = v.censo ?? (u.electores ?? '');
   $('v-votantes').value = v.votantes ?? '';
   $('v-nulos').value = v.nulos ?? '';
   $('v-blancos').value = v.blancos ?? '';
-  partidosDe(u.provincia).forEach((p) => { $('p-' + p.id).value = v.partidos?.[p.id] ?? ''; });
+  listaVotos(borrador.tipo, u.provincia).forEach((p) => { $('p-' + p.id).value = v.partidos?.[p.id] ?? ''; });
   $('v-obs').value = borrador.observaciones || '';
   recalcular();
   show('s-votos');
@@ -294,13 +327,14 @@ const n = (id) => Number($(id).value || 0);
 
 function leerVotos() {
   const partidos = {};
-  partidosDe(borrador.ubicacion.provincia).forEach((p) => { partidos[p.id] = n('p-' + p.id); });
-  return { censo: n('v-censo'), votantes: n('v-votantes'), nulos: n('v-nulos'), blancos: n('v-blancos'), partidos };
+  listaVotos(borrador.tipo, borrador.ubicacion.provincia).forEach((p) => { partidos[p.id] = n('p-' + p.id); });
+  return { tipo: borrador.tipo, censo: n('v-censo'), votantes: n('v-votantes'), nulos: n('v-nulos'), blancos: n('v-blancos'), partidos };
 }
 function recalcular() {
   if (!borrador) return;
   const v = leerVotos();
   borrador.votos = v;
+  if (borrador.tipo === 'senado') return recalcularSenado(v);
   const suma = Object.values(v.partidos).reduce((a, b) => a + b, 0) + v.nulos + v.blancos;
   const dif = v.votantes - suma;
   const st = $('v-status');
@@ -316,6 +350,27 @@ function recalcular() {
   if (v.censo && v.votantes > v.censo) { st.className = 'status bad'; st.firstElementChild.insertAdjacentHTML('beforeend', '<small><b>Hay más votantes que electores.</b></small>'); }
   return dif;
 }
+// Senado: cada papeleta puede llevar hasta 3 candidatos marcados, así que no se compara con los votantes,
+// sino que se comprueba que los votos sean posibles.
+function recalcularSenado(v) {
+  const papeletas = v.votantes - v.nulos - v.blancos;
+  const vals = Object.values(v.partidos);
+  const suma = vals.reduce((a, b) => a + b, 0), max = Math.max(0, ...vals);
+  const problemas = [];
+  if (!v.votantes) problemas.push('Escribe el total de votantes');
+  else if (papeletas < 0) problemas.push('Nulas + en blanco superan a los votantes');
+  else {
+    if (max > papeletas) problemas.push(`Un candidato tiene más votos (${max}) que papeletas válidas (${papeletas})`);
+    if (suma > 3 * papeletas) problemas.push(`Hay más votos (${suma}) de los posibles (máx. 3 por papeleta: ${3 * papeletas})`);
+    if (papeletas > 0 && suma < papeletas) problemas.push(`Hay menos votos (${suma}) que papeletas con voto (${papeletas})`);
+  }
+  if (v.censo && v.votantes > v.censo) problemas.push('Hay más votantes que electores');
+  const st = $('v-status');
+  const detalle = `<small>Papeletas con voto: ${Math.max(0, papeletas)} · Votos a candidatos: ${suma} (máx. ${Math.max(0, 3 * papeletas)})</small>`;
+  st.className = 'status ' + (problemas.length ? 'bad' : 'ok');
+  st.innerHTML = problemas.length ? `<div>⚠ ${esc(problemas[0])}${detalle}</div>` : `<div>✓ Los datos son coherentes${detalle}</div>`;
+  return problemas.length ? problemas[0] : 0;
+}
 $('v-thumb').addEventListener('click', () => modal(`<img class="zoom" src="${borrador.foto}" alt=""><div style="height:10px"></div><button class="btn" data-close>Cerrar</button>`));
 $('v-obs').addEventListener('input', () => { borrador.observaciones = $('v-obs').value; });
 
@@ -323,16 +378,19 @@ $('b-enviar').addEventListener('click', async () => {
   const dif = recalcular();
   const v = borrador.votos;
   if (!v.votantes) return alert('Falta el total de votantes.');
-  if (dif !== 0 && !confirm(`Los votos NO cuadran (${dif > 0 ? 'faltan ' + dif : 'sobran ' + -dif}).\n\nRevisa cada cifra con el acta. Si el acta está así, explícalo en Observaciones.\n\n¿Enviar igualmente?`)) return;
+  if (dif !== 0) {
+    const txt = typeof dif === 'string' ? dif : `Los votos NO cuadran (${dif > 0 ? 'faltan ' + dif : 'sobran ' + -dif})`;
+    if (!confirm(`${txt}.\n\nRevisa cada cifra con el acta. Si el acta está así, explícalo en Observaciones.\n\n¿Enviar igualmente?`)) return;
+  }
   if (!borrador.foto && !confirm('Vas a enviar el acta SIN foto. ¿Seguro?')) return;
 
-  const envio = { nombre: borrador.nombre, clientId: borrador.clientId, ubicacion: borrador.ubicacion, votos: v, observaciones: $('v-obs').value, foto: borrador.foto || null, creado: new Date().toISOString() };
+  const envio = { tipo: borrador.tipo, nombre: borrador.nombre, clientId: borrador.clientId, ubicacion: borrador.ubicacion, votos: v, observaciones: $('v-obs').value, foto: borrador.foto || null, creado: new Date().toISOString() };
   modal('<div class="spinner"></div><p>Enviando acta…</p>', { cerrar: false });
   try {
     await api('/api/actas', { method: 'POST', body: envio });
     borrador.enviado = true;
     const u = envio.ubicacion;
-    modal(`<div class="big">✅</div><h2 style="justify-content:center">Acta enviada</h2><p>${esc(u.municipio)} · Distrito ${esc(u.distrito)} · Sección ${esc(u.seccion)} · Mesa ${esc(u.mesa)}</p><button class="btn" data-close>OK</button>`);
+    modal(`<div class="big">✅</div><h2 style="justify-content:center">Acta del ${nombreTipo(envio.tipo)} enviada</h2><p>${esc(u.municipio)} · Distrito ${esc(u.distrito)} · Sección ${esc(u.seccion)} · Mesa ${esc(u.mesa)}</p><button class="btn" data-close>OK</button>`);
     borrador = null;
     inicio();
   } catch (e) {

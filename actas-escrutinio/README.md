@@ -7,6 +7,21 @@ y el equipo vea los resultados en tiempo real y las mesas con incidencias.
   «Añadir a pantalla de inicio» y queda como una app.
 - **Sin dependencias**: solo necesita Node.js 18 o superior. Los datos se guardan en la carpeta `data/`.
 
+## Congreso y Senado
+
+La app recoge las **dos actas** de cada mesa. En el paso 1 el apoderado elige **Congreso** o **Senado**:
+
+- **Congreso**: votos por candidatura (en el orden del acta de cada provincia). Debe cumplirse
+  `candidaturas + blancos + nulos = votantes`.
+- **Senado**: votos a **cada candidato** de la provincia (BOE-A-2026-23103). Como cada papeleta puede marcar hasta 3
+  candidatos, se comprueba que ningún candidato tenga más votos que papeletas válidas y que el total no supere 3 por papeleta.
+  En el panel se marcan como «Escaño» los 4 más votados de cada provincia (provisional).
+
+El panel tiene un selector **Congreso / Senado** que cambia resultados, actas y exportación CSV.
+
+Las letras de mesa (U, A, B…) y el % escrutado salen del listado oficial de **8.923 mesas** de Catalunya de las
+Generales 2023 (Ministerio del Interior). Si la letra del acta no aparece, se puede elegir «Otra…».
+
 ## Cómo funciona (apoderado)
 
 1. Abre el enlace: **no hace falta iniciar sesión**.

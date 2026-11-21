@@ -79,3 +79,16 @@ textarea { min-height: 80px; resize: vertical; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .hidden { display: none !important; }
 a { color: var(--primary); }
+
+.tipo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tipo-btn { border: 2px solid var(--line); background: #fff; border-radius: 12px; padding: 14px 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 70px; }
+.tipo-btn b { font-size: 1.15rem; }
+.tipo-btn small { color: var(--muted); }
+.tipo-btn[data-tipo="senado"] { background: #fbf3e4; }
+.tipo-btn.on { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(21,101,216,.18); }
+.tipo-btn.on b::before { content: "✓ "; color: var(--primary); }
+.cand { display: grid; grid-template-columns: 1fr 120px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.cand:last-child { border-bottom: 0; }
+.cand label { margin: 0; color: var(--text); font-size: .95rem; }
+.cand .partido-cab { grid-column: 1 / -1; margin-top: 10px; font-weight: 700; }
+.grupo-partido { font-weight: 700; margin: 14px 0 2px; display: flex; align-items: center; gap: 6px; }
