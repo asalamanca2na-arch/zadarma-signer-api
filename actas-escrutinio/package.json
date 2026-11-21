@@ -1,0 +1,9 @@
+{
+  "name": "actas-escrutinio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Recuento de actas de escrutinio la noche electoral (Catalunya)",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}

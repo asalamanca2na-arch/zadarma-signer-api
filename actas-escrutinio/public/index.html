@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1565d8">
+  <title>Recuento de actas</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- LOGIN -->
+  <section id="s-login" class="screen">
+    <img class="logo" src="/icon.svg" alt="">
+    <h1 class="center">Recuento de actas</h1>
+    <p class="center muted">Entra con tu teléfono y el PIN que te ha dado el partido.</p>
+    <form id="f-login" class="card" autocomplete="on">
+      <label for="l-tel">Teléfono móvil</label>
+      <input id="l-tel" type="tel" inputmode="tel" placeholder="600 000 000" required autocomplete="tel">
+      <label for="l-pin">PIN</label>
+      <input id="l-pin" type="password" inputmode="numeric" placeholder="••••" required autocomplete="current-password">
+      <div id="l-err" class="error hidden"></div>
+      <div style="height:14px"></div>
+      <button class="btn" type="submit">Entrar</button>
+    </form>
+    <p class="center muted">Consejo: entra <b>antes del día de la votación</b> para comprobar que tienes acceso.</p>
+  </section>
+
+  <!-- INICIO -->
+  <section id="s-home" class="screen">
+    <div class="topbar">
+      <div class="title"><span id="h-eleccion" class="badge">Elecciones</span></div>
+      <button class="btn ghost small" id="b-logout">Salir</button>
+    </div>
+    <h1>Hola, <span id="h-nombre"></span></h1>
+
+    <div id="h-pend" class="warn hidden">
+      <b><span id="h-pend-n">0</span> acta(s) pendiente(s) de enviar.</b><br>
+      Se enviarán solas cuando haya cobertura.
+      <button class="btn small" id="b-retry" style="margin-top:8px">Reintentar ahora</button>
+    </div>
+
+    <div class="card">
+      <h2>📷 Consejos para la foto</h2>
+      <ul class="tips">
+        <li>Acta entera, sin cortar ninguna esquina.</li>
+        <li>Sobre una mesa, con buena luz y sin sombras ni reflejos.</li>
+        <li>Móvil recto, encima del papel.</li>
+        <li>Que se lean bien todos los números.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>📄 Mis actas enviadas</h2>
+      <ul id="h-lista" class="list"><li class="muted">Todavía no has enviado ninguna.</li></ul>
+    </div>
+
+    <div class="footer-bar"><div class="inner">
+      <button class="btn" id="b-camara">📷 Sacar foto del acta</button>
+      <div class="row" style="margin-top:8px">
+        <button class="btn secondary" id="b-galeria">🖼️ Subir foto</button>
+        <button class="btn secondary" id="b-sinfoto">✍️ Sin foto</button>
+      </div>
+      <input id="i-camara" type="file" accept="image/*" capture="environment" class="hidden">
+      <input id="i-galeria" type="file" accept="image/*" class="hidden">
+    </div></div>
+  </section>
+
+  <!-- FOTO -->
+  <section id="s-foto" class="screen">
+    <div class="topbar"><button class="btn ghost small" data-back="s-home">← Volver</button><div class="title">Revisa la foto</div></div>
+    <img id="f-img" class="preview" alt="Foto del acta">
+    <p class="muted">¿Se ve el acta entera y se leen bien los números? Si no, repítela.</p>
+    <div class="row">
+      <button class="btn secondary" id="b-rotar">↻ Girar</button>
+      <button class="btn secondary" id="b-repetir">Repetir foto</button>
+    </div>
+    <div class="footer-bar"><div class="inner"><button class="btn" id="b-foto-ok">Continuar →</button></div></div>
+  </section>
+
+  <!-- PASO 1: UBICACIÓN -->
+  <section id="s-ubic" class="screen">
+    <div class="topbar"><button class="btn ghost small" id="b-ubic-back">← Volver</button><div class="title">Paso 1 de 2 · Mesa</div></div>
+    <div class="steps"><span class="on"></span><span></span></div>
+    <p class="muted">Comprueba que coincide con lo que pone en el acta.</p>
+    <form id="f-ubic" class="card">
+      <label for="u-prov">Provincia</label>
+      <select id="u-prov" required></select>
+      <label for="u-mun">Municipio</label>
+      <input id="u-mun" list="dl-mun" required placeholder="Escribe el municipio" autocomplete="off">
+      <datalist id="dl-mun"></datalist>
+      <div id="u-mesa-sel" class="hidden">
+        <label for="u-mesa-list">Mesa</label>
+        <select id="u-mesa-list"></select>
+      </div>
+      <div id="u-mesa-manual" class="grid3">
+        <div><label for="u-dist">Distrito</label><input id="u-dist" inputmode="numeric" placeholder="01" required></div>
+        <div><label for="u-secc">Sección</label><input id="u-secc" inputmode="numeric" placeholder="001" required></div>
+        <div><label for="u-mesa">Mesa</label><select id="u-mesa" required><option>U</option><option>A</option><option>B</option><option>C</option></select></div>
+      </div>
+      <div id="u-err" class="error hidden"></div>
+    </form>
+    <div class="footer-bar"><div class="inner"><button class="btn" id="b-ubic-ok">Siguiente →</button></div></div>
+  </section>
+
+  <!-- PASO 2: VOTOS -->
+  <section id="s-votos" class="screen">
+    <div class="topbar"><button class="btn ghost small" data-back="s-ubic">← Volver</button><div class="title">Paso 2 de 2 · Votos</div></div>
+    <div class="steps"><span class="on"></span><span class="on"></span></div>
+
+    <div class="card row">
+      <img id="v-thumb" class="thumb" alt="Ver acta">
+      <div class="grow"><b id="v-mun"></b><div class="muted" id="v-mesa"></div></div>
+      <button class="btn ghost small" data-back="s-ubic">✏️</button>
+    </div>
+
+    <div id="v-status" class="status ok"></div>
+
+    <div class="card">
+      <h2>📊 Estadísticas</h2>
+      <div class="grid2">
+        <div><label for="v-censo">Electores (censo)</label><input id="v-censo" inputmode="numeric" pattern="[0-9]*"></div>
+        <div><label for="v-votantes">Total votantes</label><input id="v-votantes" inputmode="numeric" pattern="[0-9]*"></div>
+        <div><label for="v-nulos">Votos nulos</label><input id="v-nulos" inputmode="numeric" pattern="[0-9]*"></div>
+        <div><label for="v-blancos">Votos en blanco</label><input id="v-blancos" inputmode="numeric" pattern="[0-9]*"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🗳️ Votos por partido</h2>
+      <div id="v-partidos" class="grid2"></div>
+    </div>
+
+    <div class="card">
+      <h2>📝 Observaciones <span class="muted">(opcional)</span></h2>
+      <textarea id="v-obs" placeholder="Reclamaciones, votos impugnados, errores en el acta…"></textarea>
+    </div>
+
+    <p class="muted center">Revisa <b>cada cifra</b> con el acta. Que los votos cuadren no significa que estén bien leídos.</p>
+    <div class="footer-bar"><div class="inner"><button class="btn" id="b-enviar">Enviar acta ✓</button></div></div>
+  </section>
+</div>
+
+<!-- MODAL -->
+<div id="modal" class="modal"><div class="box" id="modal-box"></div></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

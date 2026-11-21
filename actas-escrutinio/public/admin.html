@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel de resultados</title>
+  <link rel="icon" href="/icon.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .app { max-width: 1200px; padding-bottom: 40px; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+    .kpi { background: var(--card); border-radius: var(--radius); padding: 14px 16px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+    .kpi .v { font-size: 1.8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .kpi .l { color: var(--muted); font-size: .85rem; }
+    .kpi.alert .v { color: var(--bad); }
+    .bars { display: grid; gap: 8px; }
+    .bar { display: grid; grid-template-columns: 140px 1fr 140px; gap: 10px; align-items: center; font-variant-numeric: tabular-nums; }
+    .bar .track { background: #eef1f5; border-radius: 6px; height: 22px; overflow: hidden; }
+    .bar .fill { height: 100%; border-radius: 6px; }
+    .bar .num { text-align: right; font-size: .95rem; }
+    .tabs { display: flex; gap: 6px; margin: 14px 0 0; flex-wrap: wrap; }
+    .tabs button { border: 0; background: #e6eefb; color: var(--primary); padding: 10px 16px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+    .tabs button.on { background: var(--primary); color: #fff; }
+    .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+    .filters > div { flex: 1 1 180px; }
+    .filters label { margin-top: 0; }
+    .tablewrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .92rem; font-variant-numeric: tabular-nums; }
+    th, td { padding: 8px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+    th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .02em; }
+    td.n, th.n { text-align: right; }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover { background: #f6f9fe; }
+    .detail { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; text-align: left; }
+    .detail img { width: 100%; border-radius: 10px; background: #222; }
+    .modal .box.wide { max-width: 1100px; max-height: 92vh; overflow: auto; text-align: left; }
+    @media (max-width: 760px) { .detail { grid-template-columns: 1fr; } .bar { grid-template-columns: 90px 1fr 100px; } }
+    .checkline { display: flex; align-items: center; gap: 8px; color: var(--text); margin: 0; min-height: 50px; }
+    .checkline input { width: auto; min-height: 0; }
+    code { background: #eef1f5; padding: 1px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <section id="s-login" class="screen">
+    <img class="logo" src="/icon.svg" alt="">
+    <h1 class="center">Panel de resultados</h1>
+    <form id="f-login" class="card" style="max-width:420px;margin:12px auto">
+      <label for="l-pass">Contraseña de administración</label>
+      <input id="l-pass" type="password" required autocomplete="current-password">
+      <div id="l-err" class="error hidden"></div>
+      <div style="height:14px"></div>
+      <button class="btn" type="submit">Entrar</button>
+    </form>
+  </section>
+
+  <section id="s-panel" class="screen">
+    <div class="topbar">
+      <div class="title"><span class="badge" id="p-eleccion"></span> <span class="muted" id="p-upd"></span></div>
+      <a class="btn secondary small" id="b-csv" href="#">⬇ Exportar CSV</a>
+      <button class="btn ghost small" id="b-logout">Salir</button>
+    </div>
+
+    <div class="tabs">
+      <button data-tab="t-res" class="on">Resultados</button>
+      <button data-tab="t-actas">Actas e incidencias <span id="tab-inc"></span></button>
+      <button data-tab="t-conf">Configuración</button>
+    </div>
+
+    <div class="card filters" id="filtros">
+      <div><label for="f-prov">Provincia</label><select id="f-prov"><option value="">Toda Catalunya</option></select></div>
+      <div><label for="f-mun">Municipio</label><input id="f-mun" list="dl-mun" placeholder="Todos"><datalist id="dl-mun"></datalist></div>
+    </div>
+
+    <!-- RESULTADOS -->
+    <div id="t-res" class="tab">
+      <div class="kpis" id="kpis"></div>
+      <div class="card">
+        <h2>Votos por candidatura <span class="muted" style="font-weight:400">· % sobre votos válidos (incluye blancos)</span></h2>
+        <div class="bars" id="bars"></div>
+      </div>
+      <div class="card">
+        <h2>Por municipio</h2>
+        <div class="tablewrap"><table id="t-mun"></table></div>
+      </div>
+    </div>
+
+    <!-- ACTAS -->
+    <div id="t-actas" class="tab hidden">
+      <div class="card">
+        <div class="filters">
+          <div><label for="f-q">Buscar</label><input id="f-q" placeholder="Sección, mesa, apoderado…"></div>
+          <div><label class="checkline"><input type="checkbox" id="f-inc"> Solo incidencias sin revisar</label></div>
+        </div>
+        <div class="tablewrap" style="margin-top:10px"><table id="t-act"></table></div>
+      </div>
+    </div>
+
+    <!-- CONFIG -->
+    <div id="t-conf" class="tab hidden">
+      <div class="card">
+        <h2>Elección y candidaturas</h2>
+        <label for="c-eleccion">Nombre de la elección</label>
+        <input id="c-eleccion">
+        <label for="c-partidos">Candidaturas, una por línea: <code>Nombre;#color</code> (el orden es el de la app)</label>
+        <textarea id="c-partidos" rows="9"></textarea>
+        <p class="warn">Cambia las candidaturas <b>antes</b> de la noche electoral. Si quitas una, sus votos ya recibidos dejan de contar.</p>
+        <button class="btn small" id="b-conf">Guardar</button> <span id="c-msg" class="muted"></span>
+      </div>
+      <div class="card">
+        <h2>Apoderados <span class="muted" id="c-nap"></span></h2>
+        <p class="muted">CSV con columnas <code>telefono;nombre;pin</code>. Cada apoderado entra con su móvil y su PIN.</p>
+        <input type="file" id="c-ap-file" accept=".csv,text/csv,text/plain">
+        <label class="checkline"><input type="checkbox" id="c-ap-add" checked> Añadir a los existentes (si no, se sustituye la lista)</label>
+        <button class="btn small" id="b-ap">Cargar apoderados</button> <span id="c-ap-msg" class="muted"></span>
+      </div>
+      <div class="card">
+        <h2>Listado de mesas <span class="muted" id="c-nmesas"></span></h2>
+        <p class="muted">Opcional pero recomendado. CSV con columnas <code>provincia;municipio;distrito;seccion;mesa;electores</code>. Con él, los apoderados eligen la mesa de una lista, se calcula el % escrutado y se detectan censos que no cuadran.</p>
+        <input type="file" id="c-mesas-file" accept=".csv,text/csv,text/plain">
+        <button class="btn small" id="b-mesas">Cargar mesas</button> <span id="c-mesas-msg" class="muted"></span>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="modal" class="modal"><div class="box wide" id="modal-box"></div></div>
+<script src="/admin.js"></script>
+</body>
+</html>

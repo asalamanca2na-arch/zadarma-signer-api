@@ -1,0 +1,72 @@
+# Recuento de actas de escrutinio · Catalunya
+
+Web app sencilla para que los apoderados suban las actas de escrutinio la noche electoral
+y el equipo vea los resultados en tiempo real y las mesas con incidencias.
+
+- **Sin tiendas de apps**: se abre en el navegador del móvil o del ordenador. En el móvil se puede
+  «Añadir a pantalla de inicio» y queda como una app.
+- **Sin dependencias**: solo necesita Node.js 18 o superior. Los datos se guardan en la carpeta `data/`.
+
+## Cómo funciona (apoderado)
+
+1. Entra con su **teléfono + PIN** (mejor probarlo antes del día de la votación).
+2. **Saca la foto del acta** (o la sube desde la galería, o la introduce sin foto).
+3. **Paso 1 · Mesa**: provincia, municipio, distrito, sección y mesa. Si se ha cargado el listado
+   de mesas, la elige de una lista. Recuerda la última mesa usada.
+4. **Paso 2 · Votos**: censo, votantes, nulos, blancos y votos de cada candidatura.
+   Un aviso **verde** indica que los votos cuadran (`candidaturas + blancos + nulos = votantes`)
+   y uno **rojo** cuántos faltan o sobran.
+5. **Enviar** → «Acta enviada». Si no hay cobertura, el acta se guarda en el móvil y **se envía sola**
+   al volver la conexión (aparece como «Pendiente» hasta entonces).
+
+## Panel de control (`/admin`)
+
+- Actas recibidas y % escrutado, participación, nulos y blancos, votos y % por candidatura.
+- Filtros por provincia y municipio, y tabla por municipio.
+- **Actas e incidencias**: votos que no cuadran, más votantes que censo, censo distinto al oficial,
+  mesa fuera del listado, observaciones del apoderado, dos versiones distintas de la misma mesa.
+  Cada acta se abre con la foto, los datos y las versiones anteriores, y se puede marcar como revisada.
+- **Exportar CSV** (se abre en Excel) para preparar el Escrutinio General.
+- **Configuración**: nombre de la elección, candidaturas y colores, alta de apoderados y listado de mesas.
+
+## Puesta en marcha
+
+```bash
+cd actas-escrutinio
+ADMIN_PASSWORD="una-contraseña-larga" npm start
+```
+
+- App de apoderados: `http://localhost:3000`
+- Panel: `http://localhost:3000/admin`
+- Si no defines `ADMIN_PASSWORD`, se genera una y se muestra en la consola (y queda en `data/admin-password.txt`).
+
+Después, en **Configuración**:
+
+1. Revisa las **candidaturas** (vienen las del Parlament 2024 como ejemplo).
+2. Carga los **apoderados** con un CSV `telefono;nombre;pin` (ver `ejemplos/apoderados.csv`).
+3. (Recomendado) Carga el **listado de mesas** con un CSV `provincia;municipio;distrito;seccion;mesa;electores`
+   (ver `ejemplos/mesas.csv`). Se puede preparar a partir de los datos de mesas que publica la Junta Electoral / el Idescat.
+
+### Publicarla en internet
+
+Para que los móviles puedan entrar, el servidor tiene que estar accesible por **HTTPS**
+(la cámara y el modo sin conexión lo requieren). Opciones fáciles:
+
+- Un VPS pequeño (Hetzner, OVH, DigitalOcean…) con Caddy delante, que pone HTTPS automático.
+- Render / Railway / Fly.io con un **disco persistente** montado y `DATA_DIR` apuntando a él.
+
+Variables de entorno: `PORT` (3000), `ADMIN_PASSWORD`, `DATA_DIR` (`./data`), `APP_SECRET` (opcional).
+
+**Copia de seguridad**: toda la información está en `DATA_DIR` (actas en JSON y fotos en JPG). Basta con copiar esa carpeta.
+
+## Diferencias con la app del vídeo (simplificaciones)
+
+| App del partido | Esta versión |
+|---|---|
+| App nativa Android/iOS | Web app (sin instalar nada) |
+| Código por SMS | Teléfono + PIN (sin coste de SMS) |
+| Lectura automática del acta (OCR) | Introducción manual + foto como prueba |
+| Recorte automático de esquinas | Foto entera, con botón de girar |
+
+Posibles mejoras: lectura automática de cifras con IA, cálculo de concejales (D'Hondt) por municipio,
+versión en catalán, avisos por WhatsApp al equipo de soporte.
