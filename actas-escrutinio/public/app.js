@@ -161,7 +161,17 @@ function nuevoBorrador(foto) {
 }
 
 // ---------- paso 1: ubicación ----------
-function irUbicacion() {
+// Si la app aún no tiene la lista de candidaturas (primera vez y con poca cobertura), la esperamos.
+async function asegurarConfig() {
+  if (cfg) return true;
+  modal('<div class="spinner"></div><p>Cargando…</p>', { cerrar: false });
+  try { await cargarConfig(); } catch {}
+  cerrarModal();
+  if (!cfg) modal('<div class="big">📶</div><h2 style="justify-content:center">Sin conexión</h2><p>La primera vez hace falta cobertura para abrir la app. Inténtalo de nuevo en un momento.</p><button class="btn" data-close>Vale</button>');
+  return !!cfg;
+}
+async function irUbicacion() {
+  if (!(await asegurarConfig())) return;
   const ult = store.get('ultima-mesa', {});
   const sel = $('u-prov');
   sel.innerHTML = '<option value="">Elige…</option>' + (cfg?.provincias || ['Barcelona', 'Girona', 'Lleida', 'Tarragona']).map((p) => `<option>${esc(p)}</option>`).join('');
@@ -365,7 +375,8 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
     modal('<div class="big">📶</div><h2 style="justify-content:center">Sin conexión</h2><p>La primera vez hace falta cobertura para abrir la app.</p><button class="btn" onclick="location.reload()">Reintentar</button>', { cerrar: false });
     return;
   }
-  inicio();
+  // No cambiamos de pantalla: el apoderado puede haber empezado ya mientras cargaba.
+  pintarInicio(); vaciarCola();
 })();
 
 // Ocultar el aviso del paso 1 en cuanto se corrige algún dato.
