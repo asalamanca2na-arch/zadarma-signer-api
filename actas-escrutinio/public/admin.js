@@ -41,8 +41,12 @@ document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click
 }));
 
 // ---------- datos ----------
+let publica = null; // municipios, secciones y letras de mesa (lo mismo que ve la app de los apoderados)
 async function refrescar() {
-  try { datos = await api('/api/admin/resumen'); pintar(); }
+  try {
+    if (!publica) publica = await api('/api/config');
+    datos = await api('/api/admin/resumen'); pintar();
+  }
   catch (e) { $('p-upd').textContent = '⚠ ' + e.message; }
 }
 // Congreso o Senado: todo el panel (resultados, actas y exportación) muestra un solo tipo de acta.
@@ -73,7 +77,7 @@ function pintar() {
   const provs = ['Barcelona', 'Girona', 'Lleida', 'Tarragona'];
   if ($('f-prov').options.length === 1) provs.forEach((p) => $('f-prov').insertAdjacentHTML('beforeend', `<option>${p}</option>`));
   const K = claves(config, $('f-prov').value);
-  const muns = [...new Set(datos.actas.filter((a) => !$('f-prov').value || a.provincia === $('f-prov').value).map((a) => a.municipio))].sort();
+  const muns = $('f-prov').value ? publica.municipios[$('f-prov').value] || [] : [...new Set(datos.actas.map((a) => a.municipio))].sort();
   $('dl-mun').innerHTML = muns.map((m) => `<option value="${esc(m)}">`).join('');
 
   const L = filtradas();
@@ -125,14 +129,74 @@ function pintar() {
     K.forEach((p) => (m.votos[p.id] = (m.votos[p.id] || 0) + (a.votos[p.id] || 0)));
   }
   const totMesas = Object.fromEntries(datos.municipios.map((m) => [m.provincia + '|' + m.municipio, m.mesasTotal]));
-  const KM = tipo === 'senado' ? [] : K; // en el Senado la tabla por municipio solo muestra actas y participación
+  // Columnas: PP primero y después el resto por votos; las candidaturas sin votos no se muestran.
+  // En el Senado la tabla solo muestra actas y participación (hay demasiados candidatos).
+  const KM = tipo === 'senado' ? [] : K.filter((p) => p.id === 'pp' || t.votos[p.id] > 0)
+    .sort((a, b) => (b.id === 'pp') - (a.id === 'pp') || t.votos[b.id] - t.votos[a.id]);
   $('t-mun').innerHTML = `<thead><tr><th>Municipio</th><th class="n">Actas</th><th class="n">Particip.</th>${KM.map((p) => `<th class="n">${esc(p.nombre)}</th>`).join('')}</tr></thead><tbody>` +
     Object.values(ms).sort((a, b) => b.votantes - a.votantes).map((m) => `<tr data-mun="${esc(m.municipio)}" data-prov="${esc(m.provincia)}"><td><b>${esc(m.municipio)}</b> <span class="muted">${esc(m.provincia)}</span></td>
       <td class="n">${m.actas}${totMesas[m.provincia + '|' + m.municipio] ? ' / ' + totMesas[m.provincia + '|' + m.municipio] : ''}</td><td class="n">${pct(m.votantes, m.censo)}</td>
       ${KM.map((p) => `<td class="n">${fmt(m.votos[p.id])}<br><span class="muted">${pct(m.votos[p.id], m.validos)}</span></td>`).join('')}</tr>`).join('') + '</tbody>';
   $('t-mun').querySelectorAll('tr[data-mun]').forEach((tr) => tr.addEventListener('click', () => { $('f-prov').value = tr.dataset.prov; $('f-mun').value = tr.dataset.mun; pintar(); }));
 
+  pintarEscanos(config);
   pintarActas(L);
+  pintarPendientes(L);
+}
+
+// ---------- proyección de escaños del Congreso (D'Hondt, mínimo 3 % de votos válidos por provincia) ----------
+const ESCANOS = { Barcelona: 32, Girona: 6, Lleida: 4, Tarragona: 6 }; // diputados por provincia (listas del BOE 29-N-2026)
+function dhondt(votos, validos, escanos) {
+  const ids = Object.keys(votos).filter((id) => votos[id] > 0 && votos[id] >= 0.03 * validos);
+  const res = Object.fromEntries(ids.map((id) => [id, 0]));
+  for (let i = 0; i < escanos && ids.length; i++) {
+    const g = ids.reduce((m, id) => (votos[id] / (res[id] + 1) > votos[m] / (res[m] + 1) || (votos[id] / (res[id] + 1) === votos[m] / (res[m] + 1) && votos[id] > votos[m]) ? id : m), ids[0]);
+    res[g]++;
+  }
+  return res;
+}
+function pintarEscanos(config) {
+  $('c-escanos').classList.toggle('hidden', tipo === 'senado');
+  if (tipo === 'senado') return;
+  const provs = $('f-prov').value ? [$('f-prov').value] : Object.keys(ESCANOS);
+  const total = {};
+  const chips = (r) => config.partidos.filter((p) => r[p.id] > 0).sort((a, b) => r[b.id] - r[a.id] || (b.id === 'pp') - (a.id === 'pp'))
+    .map((p) => `<span class="esc" style="--c:${esc(p.color)}"><b>${r[p.id]}</b> ${esc(p.nombre)}</span>`).join('') || '<span class="muted">Sin actas todavía</span>';
+  const filas = provs.map((pr) => {
+    const A = datos.actas.filter((a) => tipoDe(a) === 'congreso' && a.provincia === pr);
+    const votos = {}; let validos = 0;
+    for (const a of A) { validos += a.validos; for (const p of config.partidos) votos[p.id] = (votos[p.id] || 0) + (a.votos[p.id] || 0); }
+    const r = A.length ? dhondt(votos, validos, ESCANOS[pr]) : {};
+    for (const id in r) total[id] = (total[id] || 0) + r[id];
+    return `<tr><td><b>${esc(pr)}</b><br><span class="muted">${ESCANOS[pr]} diputados · ${fmt(A.length)} actas</span></td><td>${chips(r)}</td></tr>`;
+  });
+  if (provs.length > 1) filas.push(`<tr><td><b>Total Catalunya</b><br><span class="muted">48 diputados</span></td><td>${chips(total)}</td></tr>`);
+  $('escanos').innerHTML = `<table class="tesc">${filas.join('')}</table>`;
+}
+
+// ---------- mesas pendientes de un municipio (las que aún no han enviado acta) ----------
+function pintarPendientes(L) {
+  const mun = $('f-mun').value.trim();
+  const prov = $('f-prov').value || Object.keys(publica.municipios).find((p) => publica.municipios[p].includes(mun));
+  const box = $('pend');
+  if (!mun || !prov || !publica.secciones?.[prov]?.[mun]) {
+    box.innerHTML = '<p class="muted">Elige arriba una <b>provincia</b> y un <b>municipio</b> para ver qué mesas todavía no han enviado el acta del ' + (tipo === 'senado' ? 'Senado' : 'Congreso') + '.</p>';
+    return;
+  }
+  const recibidas = new Set(L.filter((a) => a.municipio === mun).map((a) => `${a.distrito}|${a.seccion}|${a.mesa}`));
+  let total = 0, faltan = 0;
+  const grupos = Object.keys(publica.secciones[prov][mun]).sort().map((d) => {
+    const items = [];
+    for (const s of publica.secciones[prov][mun][d]) {
+      for (const l of publica.letras?.[[prov, mun, d, s].join('|')] || ['U']) {
+        total++;
+        if (!recibidas.has(`${d}|${s}|${l}`)) { faltan++; items.push(`<span class="mp">${Number(s)}-${l}</span>`); }
+      }
+    }
+    return items.length ? `<div class="gd"><b>Distrito ${Number(d)}</b> <span class="muted">(${items.length} pendientes)</span><div>${items.join('')}</div></div>` : '';
+  }).join('');
+  box.innerHTML = `<p><b>${esc(mun)}</b>: faltan <b style="color:var(--bad)">${fmt(faltan)}</b> de ${fmt(total)} mesas (${pct(total - faltan, total)} recibidas). Formato: <i>sección-mesa</i>.</p>` +
+    (grupos || '<p class="status ok">✓ Han llegado todas las actas de este municipio.</p>');
 }
 
 function pintarActas(L) {

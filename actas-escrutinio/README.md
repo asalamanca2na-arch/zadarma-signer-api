@@ -17,7 +17,11 @@ La app recoge las **dos actas** de cada mesa. En el paso 1 el apoderado elige **
   candidatos, se comprueba que ningún candidato tenga más votos que papeletas válidas y que el total no supere 3 por papeleta.
   En el panel se marcan como «Escaño» los 4 más votados de cada provincia (provisional).
 
-El panel tiene un selector **Congreso / Senado** que cambia resultados, actas y exportación CSV.
+El panel tiene un selector **Congreso / Senado** que cambia resultados, actas y exportación CSV. Además:
+
+- **Proyección de escaños del Congreso** por provincia (D'Hondt, mínimo 3 %): Barcelona 32, Girona 6, Lleida 4, Tarragona 6.
+- **Tabla por municipio** con la columna del municipio fija, el PP primero y solo las candidaturas con votos.
+- **Mesas pendientes**: eligiendo provincia y municipio, lista por distrito las mesas que aún no han enviado acta.
 
 Las letras de mesa (U, A, B…) y el % escrutado salen del listado oficial de **8.923 mesas** de Catalunya de las
 Generales 2023 (Ministerio del Interior). Si la mesa del acta no aparece (o ha cambiado desde 2023), se puede escribir a mano: solo la letra («✏️ Escribir…» en el desplegable) o distrito, sección y mesa («¿No aparece tu distrito, sección o mesa?»).
