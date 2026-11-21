@@ -109,14 +109,14 @@ function pintarActas(L) {
   const q = norm($('f-q').value);
   const soloInc = $('f-inc').checked;
   const filas = L.filter((a) => (!soloInc || (a.incidencia && !a.revisada)) &&
-    (!q || norm([a.municipio, a.distrito, a.seccion, a.mesa, a.enviadoPor?.nombre].join(' ')).includes(q)));
-  $('t-act').innerHTML = `<thead><tr><th>Estado</th><th>Municipio</th><th>Dist.</th><th>Secc.</th><th>Mesa</th><th class="n">Votantes</th><th>Avisos</th><th>Apoderado</th><th>Hora</th></tr></thead><tbody>` +
+    (!q || norm([a.municipio, a.colegio, a.distrito, a.seccion, a.mesa, a.enviadoPor?.nombre].join(' ')).includes(q)));
+  $('t-act').innerHTML = `<thead><tr><th>Estado</th><th>Municipio</th><th>Colegio</th><th>Dist.</th><th>Secc.</th><th>Mesa</th><th class="n">Votantes</th><th>Avisos</th><th>Apoderado</th><th>Hora</th></tr></thead><tbody>` +
     filas.map((a) => `<tr data-id="${esc(a.id)}"><td>${a.revisada ? '<span class="pill ok">Revisada</span>' : a.incidencia ? '<span class="pill bad">Incidencia</span>' : '<span class="pill ok">OK</span>'}</td>
-      <td>${esc(a.municipio)}</td><td>${esc(a.distrito)}</td><td>${esc(a.seccion)}</td><td>${esc(a.mesa)}</td><td class="n">${fmt(a.votantes)}</td>
+      <td>${esc(a.municipio)}</td><td style="white-space:normal;min-width:140px">${esc(a.colegio)}</td><td>${esc(a.distrito)}</td><td>${esc(a.seccion)}</td><td>${esc(a.mesa)}</td><td class="n">${fmt(a.votantes)}</td>
       <td style="white-space:normal;min-width:180px">${esc((a.avisos || []).join(' · '))}${a.foto ? '' : ' <span class="pill wait">Sin foto</span>'}</td>
       <td>${esc(a.enviadoPor?.nombre || 'Sin nombre')}</td>
       <td>${new Date(a.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</td></tr>`).join('') +
-    (filas.length ? '' : '<tr><td colspan="9" class="muted">No hay actas.</td></tr>') + '</tbody>';
+    (filas.length ? '' : '<tr><td colspan="10" class="muted">No hay actas.</td></tr>') + '</tbody>';
   $('t-act').querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => verActa(tr.dataset.id)));
 }
 ['f-prov', 'f-mun'].forEach((id) => $(id).addEventListener('input', () => datos && pintar()));
@@ -131,7 +131,7 @@ async function verActa(id) {
   const a = await api('/api/admin/acta?id=' + encodeURIComponent(id));
   const P = datos.config.partidos;
   const box = $('modal-box');
-  box.innerHTML = `<div class="topbar"><div class="title"><h2 style="margin:0">${esc(a.municipio)} · Dist. ${esc(a.distrito)} · Secc. ${esc(a.seccion)} · Mesa ${esc(a.mesa)}</h2></div><button class="btn ghost small" id="m-close">✕</button></div>
+  box.innerHTML = `<div class="topbar"><div class="title"><h2 style="margin:0">${esc(a.municipio)} · ${esc(a.colegio)} · Dist. ${esc(a.distrito)} · Secc. ${esc(a.seccion)} · Mesa ${esc(a.mesa)}</h2></div><button class="btn ghost small" id="m-close">✕</button></div>
     <div class="detail">
       <div>${a.foto ? `<a href="/api/admin/foto?f=${encodeURIComponent(a.foto)}&t=${encodeURIComponent(token)}" target="_blank"><img src="/api/admin/foto?f=${encodeURIComponent(a.foto)}&t=${encodeURIComponent(token)}" alt="Acta"></a><p class="muted">Pulsa la foto para abrirla en grande.</p>` : '<p class="warn">Enviada sin foto.</p>'}</div>
       <div>

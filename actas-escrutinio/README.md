@@ -9,9 +9,9 @@ y el equipo vea los resultados en tiempo real y las mesas con incidencias.
 
 ## Cómo funciona (apoderado)
 
-1. Abre el enlace: **no hace falta iniciar sesión**. Opcionalmente escribe su nombre (el móvil lo recuerda).
+1. Abre el enlace: **no hace falta iniciar sesión**.
 2. **Saca la foto del acta** (o la sube desde la galería, o la introduce sin foto).
-3. **Paso 1 · Mesa**: provincia, municipio, distrito, sección y mesa. Si se ha cargado el listado
+3. **Paso 1 · Tus datos y mesa**: **nombre y apellido** y **colegio electoral** (obligatorios; el móvil los recuerda), y provincia, municipio, distrito, sección y mesa. Si se ha cargado el listado
    de mesas, la elige de una lista. Recuerda la última mesa usada.
 4. **Paso 2 · Votos**: censo, votantes, nulos, blancos y votos de cada candidatura.
    Un aviso **verde** indica que los votos cuadran (`candidaturas + blancos + nulos = votantes`)
@@ -73,7 +73,7 @@ Variables de entorno: `PORT` (3000), `ADMIN_PASSWORD`, `DATA_DIR` (`./data`), `A
 | App del partido | Esta versión |
 |---|---|
 | App nativa Android/iOS | Web app (sin instalar nada) |
-| Código por SMS | Acceso abierto con el enlace (nombre opcional) |
+| Código por SMS | Acceso abierto con el enlace (nombre y colegio obligatorios) |
 | Lectura automática del acta (OCR) | Introducción manual + foto como prueba |
 | Recorte automático de esquinas | Foto entera, con botón de girar |
 

@@ -273,6 +273,10 @@ function guardarActa(body, user) {
     seccion: padNum(u.seccion, 3),
     mesa: String(u.mesa).trim().toUpperCase(),
   };
+  const nombre = String(body.nombre || '').trim().slice(0, 80);
+  const colegio = String(u.colegio || '').trim().slice(0, 120);
+  if (nombre.length < 3) throw Object.assign(new Error('Falta tu nombre'), { status: 400 });
+  if (colegio.length < 3) throw Object.assign(new Error('Falta el nombre del colegio electoral'), { status: 400 });
   const oficial = mesas.find((x) => norm(x.provincia) === norm(provincia) && norm(x.municipio) === norm(ubic.municipio));
   if (oficial) ubic.municipio = oficial.municipio; // nombre tal cual está en el listado oficial
   const id = mesaKey(ubic);
@@ -300,7 +304,7 @@ function guardarActa(body, user) {
   }
 
   const acta = {
-    id, ...ubic, ...datos,
+    id, ...ubic, colegio, ...datos,
     observaciones: String(body.observaciones || '').slice(0, 2000).trim(),
     foto: foto || previa?.foto || null,
     enviadoPor: { nombre: user.nombre, dispositivo: user.dispositivo },
@@ -429,10 +433,10 @@ async function handle(req, res) {
       return fs.createReadStream(file).pipe(res);
     }
     if (p === '/api/admin/export.csv' && m === 'GET') {
-      const cols = ['provincia', 'municipio', 'distrito', 'seccion', 'mesa', 'censo', 'votantes', 'nulos', 'blancos', ...config.partidos.map((x) => x.nombre), 'cuadra', 'avisos', 'observaciones', 'enviado_por', 'dispositivo', 'recibido'];
+      const cols = ['provincia', 'municipio', 'colegio', 'distrito', 'seccion', 'mesa', 'censo', 'votantes', 'nulos', 'blancos', ...config.partidos.map((x) => x.nombre), 'cuadra', 'avisos', 'observaciones', 'enviado_por', 'dispositivo', 'recibido'];
       const lines = [cols.map(csvCell).join(';')];
       for (const a of [...actas.values()].sort((x, y) => x.id.localeCompare(y.id))) {
-        lines.push([a.provincia, a.municipio, a.distrito, a.seccion, a.mesa, a.censo, a.votantes, a.nulos, a.blancos,
+        lines.push([a.provincia, a.municipio, a.colegio, a.distrito, a.seccion, a.mesa, a.censo, a.votantes, a.nulos, a.blancos,
           ...config.partidos.map((x) => a.votos[x.id] ?? 0), a.cuadra ? 'SI' : 'NO', a.avisos.join(' | '), a.observaciones,
           a.enviadoPor?.nombre, a.enviadoPor?.dispositivo?.slice(0, 8), a.recibido].map(csvCell).join(';'));
       }

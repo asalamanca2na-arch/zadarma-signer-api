@@ -86,10 +86,6 @@ async function vaciarCola() {
 window.addEventListener('online', vaciarCola);
 setInterval(vaciarCola, 30000);
 
-// ---------- nombre (opcional) ----------
-$('h-nombre').value = store.get('nombre', '');
-$('h-nombre').addEventListener('input', () => store.set('nombre', $('h-nombre').value.trim()));
-
 async function cargarConfig() {
   try { cfg = await api('/api/config'); store.set('cfg', cfg); } catch (e) { if (!cfg) throw e; }
 }
@@ -178,6 +174,8 @@ function irUbicacion() {
   rellenarMunicipios();
   mesasCargadas = null; mesasMunicipio = [];
   cargarMesas(ult);
+  $('u-nombre').value = store.get('nombre', '');
+  $('u-colegio').value = store.get('colegio', '');
   show('s-ubic');
 }
 $('b-ubic-back').addEventListener('click', () => show(borrador?.foto ? 's-foto' : 's-home'));
@@ -223,6 +221,10 @@ $('u-mesa-list').addEventListener('change', () => {
 
 $('b-ubic-ok').addEventListener('click', () => {
   const err = (t) => { $('u-err').textContent = t; $('u-err').classList.remove('hidden'); };
+  const nombre = $('u-nombre').value.trim(), colegio = $('u-colegio').value.trim();
+  if (nombre.length < 3) return err('Escribe tu nombre y apellido.');
+  if (colegio.length < 3) return err('Escribe el nombre del colegio electoral.');
+  store.set('nombre', nombre); store.set('colegio', colegio);
   const prov = $('u-prov').value, mun = $('u-mun').value.trim();
   if (!prov) return err('Elige la provincia.');
   if (!mun) return err('Escribe el municipio.');
@@ -237,7 +239,8 @@ $('b-ubic-ok').addEventListener('click', () => {
     if (cfg?.municipios?.[prov]?.length && !cfg.municipios[prov].some((x) => x.toLowerCase() === mun.toLowerCase()))
       if (!confirm(`"${mun}" no está en el listado de ${prov}. ¿Seguro que está bien escrito?`)) return;
   }
-  borrador.ubicacion = u;
+  u.colegio = colegio;
+  borrador.ubicacion = u; borrador.nombre = nombre;
   store.set('ultima-mesa', u);
   irVotos();
 });
@@ -252,7 +255,7 @@ const numIds = ['v-censo', 'v-votantes', 'v-nulos', 'v-blancos'];
 function irVotos() {
   const u = borrador.ubicacion;
   $('v-mun').textContent = `${u.municipio} (${u.provincia})`;
-  $('v-mesa').textContent = `Distrito ${u.distrito} · Sección ${u.seccion} · Mesa ${u.mesa}`;
+  $('v-mesa').textContent = `${u.colegio} · Distrito ${u.distrito} · Sección ${u.seccion} · Mesa ${u.mesa}`;
   $('v-thumb').classList.toggle('hidden', !borrador.foto);
   if (borrador.foto) $('v-thumb').src = borrador.foto;
   const v = borrador.votos || {};
@@ -311,7 +314,7 @@ $('b-enviar').addEventListener('click', async () => {
   if (dif !== 0 && !confirm(`Los votos NO cuadran (${dif > 0 ? 'faltan ' + dif : 'sobran ' + -dif}).\n\nRevisa cada cifra con el acta. Si el acta está así, explícalo en Observaciones.\n\n¿Enviar igualmente?`)) return;
   if (!borrador.foto && !confirm('Vas a enviar el acta SIN foto. ¿Seguro?')) return;
 
-  const envio = { nombre: store.get('nombre', ''), clientId: borrador.clientId, ubicacion: borrador.ubicacion, votos: v, observaciones: $('v-obs').value, foto: borrador.foto || null, creado: new Date().toISOString() };
+  const envio = { nombre: borrador.nombre, clientId: borrador.clientId, ubicacion: borrador.ubicacion, votos: v, observaciones: $('v-obs').value, foto: borrador.foto || null, creado: new Date().toISOString() };
   modal('<div class="spinner"></div><p>Enviando acta…</p>', { cerrar: false });
   try {
     await api('/api/actas', { method: 'POST', body: envio });
@@ -344,3 +347,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
   }
   inicio();
 })();
+
+// Ocultar el aviso del paso 1 en cuanto se corrige algún dato.
+$('s-ubic').addEventListener('input', () => $('u-err').classList.add('hidden'));
+$('s-ubic').addEventListener('change', () => $('u-err').classList.add('hidden'));
