@@ -1,0 +1,22 @@
+# Publicación en Render.com de la app de recuento de actas (carpeta actas-escrutinio/).
+services:
+  - type: web
+    name: actas-escrutinio
+    runtime: node
+    rootDir: actas-escrutinio
+    plan: starter            # el plan gratuito no permite disco permanente
+    region: frankfurt
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /icon.svg
+    disk:
+      name: datos
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+      - key: NODE_VERSION
+        value: "22"
+      - key: ADMIN_PASSWORD
+        generateValue: true  # contraseña del panel: se ve en Render > Environment

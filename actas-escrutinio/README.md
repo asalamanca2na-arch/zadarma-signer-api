@@ -42,12 +42,20 @@ ADMIN_PASSWORD="una-contraseña-larga" npm start
 
 Después, en **Configuración**:
 
-1. Revisa las **candidaturas** (vienen las del Parlament 2024 como ejemplo).
+1. Revisa las **candidaturas**. Vienen precargadas las del **Congreso, generales 29-N-2026** en Catalunya, sacadas de la prensa:
+   compruébalas con el BOE de proclamación y ponlas **en el mismo orden que el acta**. La fila «Otras candidaturas» recoge
+   cualquier partido que falte, para que el acta cuadre igualmente.
 2. Carga los **apoderados** con un CSV `telefono;nombre;pin` (ver `ejemplos/apoderados.csv`).
 3. (Recomendado) Carga el **listado de mesas** con un CSV `provincia;municipio;distrito;seccion;mesa;electores`
    (ver `ejemplos/mesas.csv`). Se puede preparar a partir de los datos de mesas que publica la Junta Electoral / el Idescat.
 
-### Publicarla en internet
+### Publicarla en internet (Render, recomendado)
+
+El repositorio incluye `render.yaml`, así que en Render basta con:
+**New → Blueprint → elegir este repositorio y la rama → Apply**. Crea el servicio con disco permanente,
+`DATA_DIR=/var/data` y una contraseña de administración aleatoria (se ve en *Environment → ADMIN_PASSWORD*).
+
+### Otras opciones
 
 Para que los móviles puedan entrar, el servidor tiene que estar accesible por **HTTPS**
 (la cámara y el modo sin conexión lo requieren). Opciones fáciles:

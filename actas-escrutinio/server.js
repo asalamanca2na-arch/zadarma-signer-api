@@ -40,17 +40,25 @@ if (!ADMIN_PASSWORD) {
 
 // ---------- configuración ----------
 const PROVINCIAS = ['Barcelona', 'Girona', 'Lleida', 'Tarragona'];
+// Elecciones generales 29-N-2026, Congreso. Candidaturas según la prensa (verificar con el BOE de proclamación).
+// "provincias" vacío = se presenta en las 4 circunscripciones catalanas.
 const DEFAULT_CONFIG = {
-  eleccion: 'Eleccions 2027',
+  eleccion: 'Generales 29-N 2026 · Congreso',
   partidos: [
-    { id: 'pp', nombre: 'PP', color: '#1d84ce' },
-    { id: 'psc', nombre: 'PSC', color: '#e30613' },
-    { id: 'junts', nombre: 'Junts', color: '#20c0b2' },
-    { id: 'erc', nombre: 'ERC', color: '#f4b400' },
-    { id: 'vox', nombre: 'VOX', color: '#63be21' },
-    { id: 'comuns', nombre: 'Comuns', color: '#8a3f8f' },
-    { id: 'cup', nombre: 'CUP', color: '#ffd200' },
-    { id: 'ac', nombre: 'Aliança Catalana', color: '#0b2a4a' },
+    { id: 'pp', nombre: 'PP', color: '#1d84ce', provincias: [] },
+    { id: 'psc', nombre: 'PSC', color: '#e30613', provincias: [] },
+    { id: 'junts', nombre: 'Junts', color: '#20c0b2', provincias: [] },
+    { id: 'erc', nombre: 'ERC', color: '#f4b400', provincias: [] },
+    { id: 'comuns', nombre: 'Comuns-Front Ampli', color: '#8a3f8f', provincias: [] },
+    { id: 'vox', nombre: 'VOX', color: '#63be21', provincias: [] },
+    { id: 'alhora', nombre: 'Alhora', color: '#f26522', provincias: [] },
+    { id: 'salf', nombre: 'SALF', color: '#6b4f2a', provincias: ['Barcelona'] },
+    { id: 'fo', nombre: 'FO', color: '#9e1b1b', provincias: ['Barcelona'] },
+    { id: 'pctc', nombre: 'PCTC', color: '#c00000', provincias: ['Barcelona'] },
+    { id: 'pacma', nombre: 'PACMA', color: '#2e9e57', provincias: ['Barcelona'] },
+    { id: 'd21', nombre: 'D21', color: '#5a6b7b', provincias: ['Barcelona'] },
+    { id: 'mundo-justo', nombre: 'Mundo+Justo', color: '#7a8a99', provincias: ['Barcelona'] },
+    { id: 'otros', nombre: 'Otras candidaturas', color: '#9aa5b1', provincias: [] },
   ],
 };
 const configFile = path.join(DATA_DIR, 'config.json');
@@ -259,7 +267,7 @@ function guardarActa(body, user) {
   const id = mesaKey(ubic);
   const v = body.votos || {};
   const votos = {};
-  for (const p of config.partidos) votos[p.id] = toInt(v.partidos?.[p.id]) ?? 0;
+  for (const p of config.partidos) votos[p.id] = (p.provincias?.length && !p.provincias.includes(provincia)) ? 0 : (toInt(v.partidos?.[p.id]) ?? 0);
   const datos = {
     censo: toInt(v.censo) ?? 0,
     votantes: toInt(v.votantes) ?? 0,
@@ -441,6 +449,7 @@ async function handle(req, res) {
       const partidos = (b.partidos || []).map((x) => ({
         id: String(x.id || x.nombre).trim().toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
         nombre: String(x.nombre || '').trim(), color: /^#[0-9a-f]{6}$/i.test(x.color) ? x.color : '#888888',
+        provincias: (Array.isArray(x.provincias) ? x.provincias : []).map((p) => PROVINCIAS.find((q) => norm(q) === norm(p))).filter(Boolean),
       })).filter((x) => x.id && x.nombre);
       if (!partidos.length) return send(res, 400, { error: 'Hace falta al menos un partido' });
       if (new Set(partidos.map((x) => x.id)).size !== partidos.length) return send(res, 400, { error: 'Hay partidos repetidos' });

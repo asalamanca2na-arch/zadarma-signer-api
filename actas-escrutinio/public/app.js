@@ -261,6 +261,8 @@ $('b-ubic-ok').addEventListener('click', () => {
 });
 
 // ---------- paso 2: votos ----------
+// Candidaturas que se presentan en esa provincia (sin "provincias" = en todas).
+const partidosDe = (prov) => cfg.partidos.filter((p) => !p.provincias?.length || p.provincias.includes(prov));
 const numIds = ['v-censo', 'v-votantes', 'v-nulos', 'v-blancos'];
 function irVotos() {
   const u = borrador.ubicacion;
@@ -269,16 +271,17 @@ function irVotos() {
   $('v-thumb').classList.toggle('hidden', !borrador.foto);
   if (borrador.foto) $('v-thumb').src = borrador.foto;
   const v = borrador.votos || {};
-  if (!$('v-partidos').dataset.hecho || $('v-partidos').dataset.hecho !== JSON.stringify(cfg.partidos)) {
-    $('v-partidos').innerHTML = cfg.partidos.map((p) => `<div><label for="p-${esc(p.id)}" class="party"><span class="dot" style="background:${esc(p.color)}"></span>${esc(p.nombre)}</label><input id="p-${esc(p.id)}" data-partido="${esc(p.id)}" inputmode="numeric" pattern="[0-9]*"></div>`).join('');
-    $('v-partidos').dataset.hecho = JSON.stringify(cfg.partidos);
+  const hecho = u.provincia + JSON.stringify(cfg.partidos);
+  if ($('v-partidos').dataset.hecho !== hecho) {
+    $('v-partidos').innerHTML = partidosDe(u.provincia).map((p) => `<div><label for="p-${esc(p.id)}" class="party"><span class="dot" style="background:${esc(p.color)}"></span>${esc(p.nombre)}</label><input id="p-${esc(p.id)}" data-partido="${esc(p.id)}" inputmode="numeric" pattern="[0-9]*"></div>`).join('');
+    $('v-partidos').dataset.hecho = hecho;
     $('v-partidos').querySelectorAll('input').forEach((i) => i.addEventListener('input', recalcular));
   }
   $('v-censo').value = v.censo ?? (u.electores ?? '');
   $('v-votantes').value = v.votantes ?? '';
   $('v-nulos').value = v.nulos ?? '';
   $('v-blancos').value = v.blancos ?? '';
-  cfg.partidos.forEach((p) => { $('p-' + p.id).value = v.partidos?.[p.id] ?? ''; });
+  partidosDe(u.provincia).forEach((p) => { $('p-' + p.id).value = v.partidos?.[p.id] ?? ''; });
   $('v-obs').value = borrador.observaciones || '';
   recalcular();
   show('s-votos');
@@ -291,7 +294,7 @@ const n = (id) => Number($(id).value || 0);
 
 function leerVotos() {
   const partidos = {};
-  cfg.partidos.forEach((p) => { partidos[p.id] = n('p-' + p.id); });
+  partidosDe(borrador.ubicacion.provincia).forEach((p) => { partidos[p.id] = n('p-' + p.id); });
   return { censo: n('v-censo'), votantes: n('v-votantes'), nulos: n('v-nulos'), blancos: n('v-blancos'), partidos };
 }
 function recalcular() {

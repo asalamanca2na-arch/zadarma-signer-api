@@ -158,15 +158,15 @@ $('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') $('mo
 async function cargarConfig() {
   const c = await api('/api/admin/config');
   $('c-eleccion').value = c.config.eleccion;
-  $('c-partidos').value = c.config.partidos.map((p) => `${p.nombre};${p.color}`).join('\n');
+  $('c-partidos').value = c.config.partidos.map((p) => `${p.nombre};${p.color}` + (p.provincias?.length ? ';' + p.provincias.join(',') : '')).join('\n');
   $('c-nap').textContent = `(${c.apoderados.length} dados de alta)`;
   $('c-nmesas').textContent = c.mesas ? `(${fmt(c.mesas)} mesas cargadas)` : '(no cargado)';
 }
 $('b-conf').addEventListener('click', async () => {
   const partidos = $('c-partidos').value.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => {
-    const [nombre, color] = l.split(';').map((x) => x.trim());
+    const [nombre, color, provs] = l.split(';').map((x) => x.trim());
     const previo = datos?.config.partidos.find((p) => p.nombre === nombre);
-    return { id: previo?.id || nombre, nombre, color };
+    return { id: previo?.id || nombre, nombre, color, provincias: provs ? provs.split(',').map((x) => x.trim()).filter(Boolean) : [] };
   });
   try {
     await api('/api/admin/config', { method: 'PUT', body: { eleccion: $('c-eleccion').value, partidos } });
