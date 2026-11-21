@@ -1,0 +1,46 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Actas de prueba</title><style>
+@page { size: A4; margin: 12mm 14mm; }
+body { font: 13pt/1.4 Arial, sans-serif; color:#111; }
+.pag { page-break-after: always; position: relative; }
+.pag:last-child { page-break-after: auto; }
+h1 { font-size: 18pt; margin: 0 0 3mm; } h2 { font-size: 13pt; margin: 3.5mm 0 1.5mm; }
+.marca { position: absolute; top: 90mm; left: 0; right: 0; text-align: center; font-size: 90pt; font-weight: 900; color: rgba(200,0,0,.10); transform: rotate(-30deg); pointer-events:none; }
+.aviso { border: 2px solid #c00; color: #c00; font-weight: 700; text-align:center; padding: 1.5mm; margin-bottom: 3mm; }
+table { border-collapse: collapse; width: 100%; } td { border: 1px solid #333; padding: 1.1mm 3mm; font-size: 12pt; }
+td.n { text-align: right; font-weight: 700; font-size: 14pt; width: 28mm; font-family: 'Courier New', monospace; }
+.mesa td { font-size: 12pt; } .peq { font-size: 10.5pt; color:#444; }
+.sen td { padding: 0.3mm 3mm; font-size: 10pt; line-height: 1.25; } .sen td.n { font-size: 11pt; }
+.grupo td { background: #eee; font-weight: 700; }
+ol li { margin: 2mm 0; } .box { border:1px solid #999; border-radius:3mm; padding:3mm 5mm; margin:3mm 0; }
+</style></head><body>
+<div class="pag"><h1>Cómo probar la app de actas con una foto</h1>
+<ol>
+<li>Imprime las páginas 2 y 3 (o ábrelas en el ordenador y fotografía la pantalla).</li>
+<li>En el móvil abre <b>https://actas-escrutinio.onrender.com</b>.</li>
+<li>Pulsa <b>«Sacar foto del acta»</b> y fotografía la <b>página 2</b> (acta del Congreso). Revisa que se lea y pulsa «Continuar».</li>
+<li><b>Paso 1:</b> elige <b>Congreso</b>, escribe tu nombre y el colegio, y elige la mesa: Barcelona → Barcelona → Distrito 2 → Sección 5 → Mesa A.</li>
+<li><b>Paso 2:</b> copia los números de la hoja. Debe salir en <b style="color:#1a8f4a">verde «Los votos cuadran» (583 de 583)</b>. Pulsa «Enviar acta».</li>
+<li>Repite con la <b>página 3</b> (acta del Senado), eligiendo <b>Senado</b> y la misma mesa. Debe salir <b style="color:#1a8f4a">«Los datos son coherentes»</b>.</li>
+<li>En el ordenador abre <b>https://actas-escrutinio.onrender.com/admin</b>: verás las dos actas con su foto, y con el botón <b>Congreso / Senado</b> los resultados de cada una.</li>
+</ol>
+<div class="box"><b>Prueba también un error:</b> envía otra vez el acta del Congreso pero con <b>Mesa B</b> y el <b>PP con 179</b> en vez de 200. Debe salir en <b style="color:#c62828">rojo «Faltan 21 votos»</b> y en el panel aparecerá como <b>incidencia</b>.</div>
+<div class="box"><b>Prueba sin cobertura:</b> pon el móvil en modo avión antes de pulsar «Enviar». La app dirá que se ha guardado; quita el modo avión y en unos segundos pasará a «Enviada».</div>
+<div class="box"><b>Al terminar:</b> en el panel, <b>Configuración → «Borrar todas las actas»</b>, para empezar limpio antes del 29-N.</div>
+<p class="peq">Los datos de estas hojas son inventados. Son solo para practicar y no corresponden a ningún resultado real.</p>
+</div>
+
+<div class="pag"><div class="marca">PRUEBA</div>
+<div class="aviso">ACTA DE PRUEBA · DATOS FICTICIOS · NO VÁLIDA</div>
+<h1>Acta de escrutinio · CONGRESO</h1><table class="mesa"><tr><td>Provincia</td><td><b>Barcelona</b></td><td>Municipio</td><td><b>Barcelona</b></td></tr>
+<tr><td>Distrito</td><td><b>02</b></td><td>Sección</td><td><b>005</b></td></tr><tr><td>Mesa</td><td><b>A</b></td><td>Colegio</td><td><b>Escola de prova</b></td></tr></table>
+<h2>Resultados</h2><table><tr><td>Electores (censo)</td><td class='n'>812</td><td>Total votantes</td><td class='n'>583</td></tr><tr><td>Votos nulos</td><td class='n'>6</td><td>Votos en blanco</td><td class='n'>9</td></tr></table>
+<h2>Votos a cada candidatura</h2><table><tr><td>1. PSC</td><td class='n'>160</td></tr><tr><td>2. Junts</td><td class='n'>45</td></tr><tr><td>3. ERC</td><td class='n'>40</td></tr><tr><td>4. Frente Obrero (FO)</td><td class='n'>1</td></tr><tr><td>5. Se Acabó La Fiesta (SALF)</td><td class='n'>3</td></tr><tr><td>6. PCTC</td><td class='n'>1</td></tr><tr><td>7. VOX</td><td class='n'>80</td></tr><tr><td>8. Comuns-Front Ampli</td><td class='n'>30</td></tr><tr><td>9. PP</td><td class='n'>200</td></tr><tr><td>10. Por un Mundo más Justo</td><td class='n'>0</td></tr><tr><td>11. Democracia S.21 (D21)</td><td class='n'>1</td></tr><tr><td>12. PACMA</td><td class='n'>4</td></tr><tr><td>13. Alhora</td><td class='n'>3</td></tr></table>
+<p class="peq">Comprobación: candidaturas 568 + nulos 6 + blancos 9 = 583 votantes.</p></div>
+
+<div class="pag"><div class="marca">PRUEBA</div>
+<div class="aviso">ACTA DE PRUEBA · DATOS FICTICIOS · NO VÁLIDA</div>
+<h1>Acta de escrutinio · SENADO</h1><table class="mesa"><tr><td>Provincia</td><td><b>Barcelona</b></td><td>Municipio</td><td><b>Barcelona</b></td></tr>
+<tr><td>Distrito</td><td><b>02</b></td><td>Sección</td><td><b>005</b></td></tr><tr><td>Mesa</td><td><b>A</b></td><td>Colegio</td><td><b>Escola de prova</b></td></tr></table>
+<h2>Resultados</h2><table><tr><td>Electores (censo)</td><td class='n'>812</td><td>Total votantes</td><td class='n'>583</td></tr><tr><td>Papeletas nulas</td><td class='n'>8</td><td>Papeletas en blanco</td><td class='n'>15</td></tr></table>
+<p class="peq" style="margin:1mm 0 0">Comprobación: 560 papeletas con voto; 1476 votos a candidatos (máximo posible 3 × 560 = 1.680).</p><h2>Votos a cada candidato</h2><table class="sen"><tr class='grupo'><td colspan='2'>PSC</td></tr><tr><td>Raquel Sánchez Jimenez</td><td class='n'>150</td></tr><tr><td>Gabriel Colomé Garcia</td><td class='n'>140</td></tr><tr><td>Cristobalina Albéndiz Pérez</td><td class='n'>135</td></tr><tr class='grupo'><td colspan='2'>Junts</td></tr><tr><td>Josep Maria Vida de Abadal i Serra</td><td class='n'>40</td></tr><tr><td>Anna Cols i Aguilar</td><td class='n'>38</td></tr><tr><td>Oriol Izquierdo i Llopis</td><td class='n'>36</td></tr><tr class='grupo'><td colspan='2'>ERC-EH Bildu</td></tr><tr><td>Francesc-Marc Álvaro i Vidal</td><td class='n'>35</td></tr><tr><td>Mercedes Vidal Lago</td><td class='n'>33</td></tr><tr><td>Joaquim (Pim) Camprubí i Cabané</td><td class='n'>30</td></tr><tr class='grupo'><td colspan='2'>PCTC</td></tr><tr><td>Ferran Peris Serrano</td><td class='n'>2</td></tr><tr class='grupo'><td colspan='2'>Comuns-Front Ampli</td></tr><tr><td>Laura Alzamora Merino</td><td class='n'>25</td></tr><tr><td>Miquel Àngel Essomba Gelabert</td><td class='n'>22</td></tr><tr><td>Aïda Llauradó Álvarez</td><td class='n'>20</td></tr><tr class='grupo'><td colspan='2'>VOX</td></tr><tr><td>María Elisa García Fuster</td><td class='n'>70</td></tr><tr><td>Jorge Mena Gálvez</td><td class='n'>65</td></tr><tr><td>María Montserrat Piqueras Ruiz</td><td class='n'>60</td></tr><tr class='grupo'><td colspan='2'>PP</td></tr><tr><td>Josep Tutusaus Besante</td><td class='n'>200</td></tr><tr><td>Mónica Parés Centeno</td><td class='n'>190</td></tr><tr><td>Javier Guasch Torrens</td><td class='n'>185</td></tr></table></div>
+</body></html>
