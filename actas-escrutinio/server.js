@@ -1184,7 +1184,7 @@ async function handle(req, res) {
     if (lecturasCache.has(h)) return send(res, 200, { ok: true, lectura: lecturasCache.get(h) });
     const t0 = Date.now();
     const { datos, uso } = await lector.leerActa({ fotoBase64: mm[2], mediaType: mm[1], config, provincias: PROVINCIAS });
-    console.log(`[lectura] ${Date.now() - t0} ms · tokens entrada ${uso?.input_tokens} salida ${uso?.output_tokens}`);
+    console.log(`[lectura] ${Date.now() - t0} ms · entrada ${uso?.input_tokens} · caché leída ${uso?.cache_read_input_tokens || 0} · caché escrita ${uso?.cache_creation_input_tokens || 0} · salida ${uso?.output_tokens}`);
     const L = normalizarLectura(datos);
     guardarEnCache(h, L);
     return send(res, 200, { ok: true, lectura: L });

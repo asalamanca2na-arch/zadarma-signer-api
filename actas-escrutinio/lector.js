@@ -85,7 +85,8 @@ async function leerActa({ fotoBase64, mediaType, config, provincias }) {
     betas: ['server-side-fallback-2026-07-01'],
     fallbacks: 'default', // si el modelo rechaza la petición, la API la repite en otro modelo
     output_config: { effort: 'medium', format: { type: 'json_schema', schema: esquema(config, provincias) } },
-    system: SISTEMA + '\n\n' + catalogo(config, provincias),
+    // Las instrucciones y el catálogo son iguales en todas las lecturas: se guardan en caché (las siguientes cuestan ~20 veces menos).
+    system: [{ type: 'text', text: SISTEMA + '\n\n' + catalogo(config, provincias), cache_control: { type: 'ephemeral' } }],
     messages: [{
       role: 'user',
       content: [
