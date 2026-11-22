@@ -76,15 +76,15 @@ Cómo es el acta y qué campo corresponde a qué:
 - Si la imagen es un ESCRITO DE RECLAMACIÓN (o protesta/impugnación): es_acta=false, documento=reclamacion; rellena la mesa (provincia, municipio, distrito, sección, mesa), "tipo" si dice Congreso o Senado (si no, desconocido), "reclamacion_texto" con la anomalía transcrita y "reclamante". Censo, votantes, nulos y blancos a -1 y votos vacío.
 - Si la imagen no es ni un acta ni una reclamación, pon es_acta=false, documento=otro y deja el resto vacío o a -1.`;
 
-async function leerActa({ fotoBase64, mediaType, config, provincias }) {
+async function leerActa({ fotoBase64, mediaType, config, provincias, modelo = MODELO, effort = 'medium' }) {
   const c = getCliente();
   if (!c) throw Object.assign(new Error('La lectura automática no está configurada'), { status: 503, codigo: 'sin_ia' });
   const resp = await c.beta.messages.create({
-    model: MODELO,
+    model: modelo,
     max_tokens: 16000,
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default', // si el modelo rechaza la petición, la API la repite en otro modelo
-    output_config: { effort: 'medium', format: { type: 'json_schema', schema: esquema(config, provincias) } },
+    // Si el modelo rechaza la petición, la API la repite en otro modelo (Haiku no admite esta opción).
+    ...(modelo.includes('haiku') ? {} : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }),
+    output_config: { effort, format: { type: 'json_schema', schema: esquema(config, provincias) } },
     // Las instrucciones y el catálogo son iguales en todas las lecturas: se guardan en caché (las siguientes cuestan ~20 veces menos).
     system: [{ type: 'text', text: SISTEMA + '\n\n' + catalogo(config, provincias), cache_control: { type: 'ephemeral' } }],
     messages: [{
