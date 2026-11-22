@@ -230,7 +230,7 @@ function pintarActas(L) {
   const filas = L.filter((a) => (!soloInc || (a.incidencia && !a.revisada)) &&
     (!q || norm([a.municipio, a.colegio, a.distrito, a.seccion, a.mesa, a.enviadoPor?.nombre].join(' ')).includes(q)));
   $('t-act').innerHTML = `<thead><tr><th>Foto</th><th>Estado</th><th>Municipio</th><th>Colegio</th><th>Dist.</th><th>Secc.</th><th>Mesa</th><th class="n">Votantes</th><th>Avisos</th><th>Apoderado</th><th>Hora</th></tr></thead><tbody>` +
-    filas.map((a) => `<tr data-id="${esc(a.id)}"><td>${a.foto ? `<div class="row" style="gap:6px"><img class="mini" loading="lazy" src="${fotoUrl(a.foto)}" alt="Foto"><a class="dl" href="${fotoDescarga(a.foto)}" download="${esc(nombreFoto(a))}" title="Descargar la foto" data-nofila>⬇</a></div>` : '<span class="pill wait">Sin foto</span>'}</td><td>${a.revisada ? '<span class="pill ok">Verificada</span>' : a.incidencia ? '<span class="pill bad">Incidencia</span>' : '<span class="pill ok">OK</span>'}<div style="margin-top:4px">${iaPill(a)}</div></td>
+    filas.map((a) => `<tr data-id="${esc(a.id)}"><td>${a.foto ? `<div class="row" style="gap:6px"><img class="mini" loading="lazy" src="${fotoUrl(a.foto)}" alt="Foto"><a class="dl" href="${fotoDescarga(a.foto)}" download="${esc(nombreFoto(a))}" title="Descargar la foto" data-nofila>⬇</a></div>` : '<span class="pill wait">Sin foto</span>'}</td><td>${a.revisada ? '<span class="pill ok">Verificada</span>' : a.incidencia ? '<span class="pill bad">Incidencia</span>' : '<span class="pill ok">OK</span>'}${a.foto ? `<div style="margin-top:4px">${iaPill(a)}</div>` : ''}</td>
       <td>${esc(a.municipio)}</td><td style="white-space:normal;min-width:140px">${esc(a.colegio)}</td><td>${esc(a.distrito)}</td><td>${esc(a.seccion)}</td><td>${esc(a.mesa)}</td><td class="n">${fmt(a.votantes)}</td>
       <td style="white-space:normal;min-width:180px">${esc((a.avisos || []).join(' · '))}${a.confirmaciones?.length ? ` <span class="pill ok">Confirmada ${a.confirmaciones.length + 1}×</span>` : ''}</td>
       <td>${esc(a.enviadoPor?.nombre || 'Sin nombre')}</td>
@@ -470,14 +470,30 @@ async function subirCSV(fileId, url, msgId, extra = {}) {
     cargarConfig(); refrescar();
   } catch (e) { $(msgId).textContent = '⚠ ' + e.message + (e.data?.errores?.length ? ' — ' + e.data.errores.slice(0, 3).join('; ') : ''); }
 }
-$('b-borrar-todas').addEventListener('click', async () => {
-  const c = prompt('Esto borra TODAS las actas y reclamaciones recibidas (por ejemplo, las de prueba). Escribe BORRAR para confirmar:');
-  if (c !== 'BORRAR') return;
-  try {
-    const r = await api('/api/admin/borrar-todas', { method: 'POST', body: { confirmacion: 'BORRAR' } });
-    $('c-borrar-msg').textContent = `✓ ${r.borradas} actas y ${r.reclamaciones || 0} reclamaciones borradas`; refrescar();
-  } catch (e) { $('c-borrar-msg').textContent = '⚠ ' + e.message; }
-});
+// Borrar todas las actas y reclamaciones de una vez (con una sola confirmación).
+function borrarTodas() {
+  const nA = datos?.actas.length || 0, nR = datos?.reclamaciones?.length || 0;
+  $('modal-box').style.maxWidth = '520px';
+  $('modal-box').innerHTML = `<div style="text-align:center"><div style="font-size:3rem">🗑</div><h2 style="justify-content:center;margin:6px 0">¿Borrar todas las actas?</h2>
+    <p>Se borrarán <b>${fmt(nA)} actas</b> (Congreso y Senado) y <b>${fmt(nR)} reclamaciones</b>, con sus fotos. Los resultados quedarán a cero.</p>
+    <p class="muted">Úsalo para quitar las pruebas antes de la noche electoral. Si quieres conservar algo, descárgalo antes en «⬇ Descargas».</p>
+    <button class="btn danger" id="bt-si" style="margin-top:8px">Sí, borrar todo</button><button class="btn secondary" id="bt-no" style="margin-top:8px">Cancelar</button>
+    <p id="bt-msg" class="muted"></p></div>`;
+  $('modal').classList.add('open');
+  const cerrar = () => { $('modal').classList.remove('open'); $('modal-box').style.maxWidth = ''; };
+  $('bt-no').onclick = cerrar;
+  $('bt-si').onclick = async () => {
+    $('bt-si').disabled = true; $('bt-si').textContent = 'Borrando…';
+    try {
+      const r = await api('/api/admin/borrar-todas', { method: 'POST', body: { confirmacion: 'BORRAR' } });
+      const txt = `✓ ${fmt(r.borradas)} actas y ${fmt(r.reclamaciones || 0)} reclamaciones borradas`;
+      if ($('c-borrar-msg')) $('c-borrar-msg').textContent = txt;
+      cerrar(); await refrescar(); alert(txt);
+    } catch (e) { $('bt-msg').textContent = '⚠ ' + e.message; $('bt-si').disabled = false; $('bt-si').textContent = 'Sí, borrar todo'; }
+  };
+}
+$('b-borrar-todas').addEventListener('click', borrarTodas);
+$('b-borrar-todas-2').addEventListener('click', borrarTodas);
 $('b-dist').addEventListener('click', () => subirCSV('c-dist-file', '/api/admin/distritos', 'c-dist-msg'));
 $('b-dist-csv').addEventListener('click', (e) => { e.preventDefault(); location.href = '/api/admin/distritos.csv?t=' + encodeURIComponent(token); });
 $('b-mesas').addEventListener('click', () => subirCSV('c-mesas-file', '/api/admin/mesas', 'c-mesas-msg'));
