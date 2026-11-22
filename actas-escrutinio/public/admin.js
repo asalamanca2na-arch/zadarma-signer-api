@@ -248,7 +248,7 @@ function ordenActa(a) {
   // Orden del BOE de la provincia; el número es la posición en el acta (solo candidaturas proclamadas allí).
   const enActa = datos.config.partidos.filter((p) => p.orden?.[a.provincia] != null).sort((x, y) => x.orden[a.provincia] - y.orden[a.provincia]);
   const otras = datos.config.partidos.filter((p) => p.orden?.[a.provincia] == null && a.votos && p.id in a.votos && a.votos[p.id]);
-  return [...enActa.map((p, i) => [`${i + 1}. ${p.nombre}`, p.id]), ...otras.map((p) => [`${p.nombre} (no está en el acta)`, p.id])];
+  return [...enActa.map((p, i) => [`${i + 1}. ${p.nombre}`, p.id]), ...otras.map((p) => [`⚠ ${p.nombre} (no se presenta en ${a.provincia})`, p.id])];
 }
 function tablaVotos(a, actual) {
   const sen = a.tipo === 'senado';

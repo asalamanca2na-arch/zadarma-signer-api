@@ -707,6 +707,11 @@ function calcula(a) {
   const nRecl = reclDeActa(a).length;
   if (nRecl) avisos.push(`📝 Tiene ${nRecl} reclamación(es)`);
   if (a.observaciones) avisos.push('Tiene observaciones');
+  // Votos a candidaturas que no están proclamadas en esa provincia (no figuran en su acta).
+  if (a.tipo !== 'senado') {
+    const fuera = config.partidos.filter((p) => !sePresenta(p, a.provincia) && (a.votos?.[p.id] || 0) > 0).map((p) => `${p.nombre} (${a.votos[p.id]})`);
+    if (fuera.length) avisos.push(`Votos a candidaturas que no se presentan en ${a.provincia}: ${fuera.join(', ')}`);
+  }
   const pend = (a.comentarios || []).filter((c) => !c.leido).length;
   if (pend) avisos.push(`${pend} comentario(s) del apoderado`);
   a.avisos = avisos;
