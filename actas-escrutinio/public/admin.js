@@ -334,12 +334,14 @@ $('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') $('mo
 
 // ---------- reclamaciones ----------
 const tipoRecl = (t) => (t === 'senado' ? 'Senado' : t === 'congreso' ? 'Congreso' : 'Ambas');
+// Reclamaciones del tipo elegido arriba (Congreso o Senado); las de «Las dos» salen en ambos.
+const deEsteTipo = (r) => !r.tipo || r.tipo === 'ambas' || r.tipo === tipo;
 function reclFiltradas() {
   const prov = $('f-prov').value, mun = norm($('f-mun').value);
-  return (datos.reclamaciones || []).filter((r) => (!prov || r.provincia === prov) && (!mun || norm(r.municipio) === mun));
+  return (datos.reclamaciones || []).filter((r) => deEsteTipo(r) && (!prov || r.provincia === prov) && (!mun || norm(r.municipio) === mun));
 }
 function pintarReclamaciones() {
-  const pend = (datos.reclamaciones || []).filter((r) => !r.revisada).length;
+  const pend = (datos.reclamaciones || []).filter((r) => !r.revisada && deEsteTipo(r)).length;
   $('tab-recl').textContent = pend ? `(${pend})` : '';
   const filas = reclFiltradas().filter((r) => !$('f-recl-pend').checked || !r.revisada);
   $('t-rec').innerHTML = `<thead><tr><th>Foto</th><th>Estado</th><th>Elección</th><th>Municipio</th><th>Colegio</th><th>Dist.</th><th>Secc.</th><th>Mesa</th><th>Reclamación</th><th>Enviada por</th><th>Hora</th></tr></thead><tbody>` +
@@ -348,7 +350,7 @@ function pintarReclamaciones() {
       <td>${esc(r.municipio)}</td><td style="white-space:normal;min-width:120px">${esc(r.colegio)}</td><td>${esc(r.distrito)}</td><td>${esc(r.seccion)}</td><td>${esc(r.mesa)}</td>
       <td style="white-space:normal;min-width:240px">${esc(r.texto || '—')}</td><td>${esc(r.enviadoPor?.nombre || '')}</td>
       <td>${new Date(r.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</td></tr>`).join('') +
-    (filas.length ? '' : '<tr><td colspan="11" class="muted">No hay reclamaciones.</td></tr>') + '</tbody>';
+    (filas.length ? '' : `<tr><td colspan="11" class="muted">No hay reclamaciones del ${tipo === 'senado' ? 'Senado' : 'Congreso'}.</td></tr>`) + '</tbody>';
   $('t-rec').querySelectorAll('tr[data-recl]').forEach((tr) => tr.addEventListener('click', (e) => { if (!e.target.closest('[data-nofila]')) verReclamacion(tr.dataset.recl); }));
 }
 $('f-recl-pend').addEventListener('input', () => datos && pintarReclamaciones());
