@@ -60,12 +60,16 @@ function esquema(config, provincias) {
   };
 }
 
-const SISTEMA = `Lees fotos de actas de escrutinio de mesas electorales de Catalunya (elecciones generales: Congreso y Senado) para una app de recuento.
-Tu trabajo es transcribir, no calcular: copia cada cifra exactamente como está escrita en el acta, aunque los totales no cuadren. Nunca inventes ni corrijas un número; si una cifra no se lee con seguridad, pon -1 y menciónala en "dudas".
-- El acta del Congreso tiene votos por candidatura (partido). El acta del Senado tiene votos por candidato (persona) y habla de "papeletas" nulas y en blanco.
-- Usa solo los identificadores (id) del catálogo de la provincia del acta. Si en el acta aparece una candidatura o candidato con votos que no está en el catálogo, menciónalo en "dudas".
-- "censo" es el número de electores de la mesa; "votantes" es el total de votantes.
-- Si la imagen no es un acta de escrutinio, pon es_acta=false y deja el resto vacío o a -1.`;
+const SISTEMA = `Lees fotos de actas de escrutinio (o actas de sesión) de mesas electorales de Catalunya (elecciones generales: Congreso y Senado) para una app de recuento. Suelen estar escritas a mano, en castellano o catalán, con tachones y correcciones.
+Tu trabajo es transcribir, no inventar: copia cada cifra tal como está en el acta, aunque los totales no cuadren. Si una cifra no se lee con seguridad, pon -1 y menciónala en "dudas".
+Cómo es el acta y qué campo corresponde a qué:
+- Cabecera: provincia, municipio, "distrito censal", "sección" y "mesa" (U, A, B...). El acta del Congreso pone "CONGRESO DE LOS DIPUTADOS"; la del Senado pone "SENADO", tiene votos por candidato (persona) y habla de "papeletas".
+- "censo" = TOTAL ELECTORES (1+2): electores según las listas del censo + certificaciones de alta. Si ese total está en blanco pero están el 1 y el 2, súmalos y dilo en "dudas".
+- "votantes" = TOTAL VOTANTES (A+B): electores censados que han votado + interventores no censados. Si el total está en blanco o escrito como una suma (p. ej. "370 + 3"), calcula A+B y dilo en "dudas".
+- "nulos" = número de votos (o papeletas) nulos; "blancos" = votos (o papeletas) en blanco. Una raya o un guion significa 0.
+- Cada candidatura tiene el número escrito dos veces: "en letra" y "en núm.". Usa las dos para leer bien cada cifra. Si no coinciden, elige la que tenga más sentido con el resto del acta y explícalo en "dudas". Si una cifra está tachada y corregida, vale la corrección. Una raya o un guion es 0. Fíjate en la fila: los números van alineados con el nombre de su candidatura.
+- Usa solo los identificadores (id) del catálogo de la provincia del acta, y solo cuando sea la MISMA candidatura (mismo nombre o siglas). Nunca pases los votos de una candidatura a otra distinta aunque se parezca. Si en el acta hay candidaturas o candidatos con votos que no están en el catálogo, no los pongas en "votos" y di en "dudas" cuáles son y cuántos votos tienen.
+- Si la imagen no es un acta de escrutinio o de sesión, pon es_acta=false y deja el resto vacío o a -1.`;
 
 async function leerActa({ fotoBase64, mediaType, config, provincias }) {
   const c = getCliente();
