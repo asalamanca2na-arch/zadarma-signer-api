@@ -9,9 +9,11 @@ https://actas-escrutinio.onrender.com
 
 No hace falta usuario ni contraseña.
 
-✅ *ANTES DEL DÍA (importante):*
-• Abre el enlace y pulsa *«Instalar»* para tener el icono en el móvil.
-• En iPhone, ábrelo con *Safari* → Compartir ⬆️ → *«Añadir a pantalla de inicio»*.
+📱 *Dos formas de usarla (funcionan igual):*
+🌐 *Desde el navegador* (Chrome, Safari…): abre el enlace y listo, no hace falta descargar nada.
+📥 *Instalada en el móvil* (opcional): pulsa *«Instalar»* y tendrás el icono en la pantalla de inicio. En iPhone, desde *Safari* → Compartir ⬆️ → *«Añadir a pantalla de inicio»*.
+
+✅ *ANTES DEL DÍA (importante):* ábrela al menos una vez para comprobar que te funciona.
 
 📸 *LA NOCHE ELECTORAL, en 4 pasos:*
 1️⃣ Pulsa *«Sacar foto del acta»*: el acta entera, sobre una mesa y con buena luz.
