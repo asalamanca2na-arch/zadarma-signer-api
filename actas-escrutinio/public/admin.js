@@ -156,8 +156,8 @@ function dhondt(votos, validos, escanos) {
   return res;
 }
 function pintarEscanos(config) {
-  $('c-escanos').classList.toggle('hidden', tipo === 'senado');
-  if (tipo === 'senado') return;
+  if (tipo === 'senado') return pintarEscanosSenado(config);
+  $('h-escanos').innerHTML = `Proyección de escaños · Congreso <span class="muted" style="font-weight:400">· D'Hondt con mínimo del 3 %, solo con las actas recibidas</span>`;
   const provs = $('f-prov').value ? [$('f-prov').value] : Object.keys(ESCANOS);
   const total = {};
   const chips = (r) => config.partidos.filter((p) => r[p.id] > 0).sort((a, b) => r[b.id] - r[a.id] || (b.id === 'pp') - (a.id === 'pp'))
@@ -171,6 +171,32 @@ function pintarEscanos(config) {
     return `<tr><td><b>${esc(pr)}</b><br><span class="muted">${ESCANOS[pr]} diputados · ${fmt(A.length)} actas</span></td><td>${chips(r)}</td></tr>`;
   });
   if (provs.length > 1) filas.push(`<tr><td><b>Total Catalunya</b><br><span class="muted">48 diputados</span></td><td>${chips(total)}</td></tr>`);
+  $('escanos').innerHTML = `<table class="tesc">${filas.join('')}</table>`;
+}
+
+// ---------- proyección de escaños del Senado ----------
+// Cada provincia elige 4 senadores: los 4 candidatos más votados (cada elector marca hasta 3).
+const SENADORES = 4;
+function pintarEscanosSenado(config) {
+  $('h-escanos').innerHTML = `Proyección de escaños · Senado <span class="muted" style="font-weight:400">· ${SENADORES} senadores por provincia: los ${SENADORES} candidatos más votados, solo con las actas recibidas</span>`;
+  const provs = $('f-prov').value ? [$('f-prov').value] : Object.keys(config.senado || {});
+  const total = {}; // partido -> { n, color }
+  const chips = (porPartido) => Object.entries(porPartido).sort((a, b) => b[1].n - a[1].n || (b[0] === 'PP') - (a[0] === 'PP'))
+    .map(([partido, x]) => `<span class="esc" style="--c:${esc(x.color)}"><b>${x.n}</b> ${esc(partido)}</span>`).join('');
+  const filas = provs.map((pr) => {
+    const A = datos.actas.filter((a) => tipoDe(a) === 'senado' && a.provincia === pr);
+    const votos = {};
+    for (const a of A) for (const c of config.senado[pr] || []) votos[c.id] = (votos[c.id] || 0) + (a.votos[c.id] || 0);
+    const electos = (config.senado[pr] || []).filter((c) => votos[c.id] > 0).sort((a, b) => votos[b.id] - votos[a.id]).slice(0, SENADORES);
+    const porPartido = {};
+    for (const c of electos) {
+      (porPartido[c.partido] ||= { n: 0, color: c.color }).n++;
+      (total[c.partido] ||= { n: 0, color: c.color }).n++;
+    }
+    const nombres = electos.map((c) => `${esc(c.nombre)} <span class="muted">(${esc(c.partido)}, ${fmt(votos[c.id])})</span>`).join(' · ');
+    return `<tr><td><b>${esc(pr)}</b><br><span class="muted">${SENADORES} senadores · ${fmt(A.length)} actas</span></td><td>${electos.length ? chips(porPartido) + `<div class="muted" style="font-size:.85rem;margin-top:4px">${nombres}</div>` : '<span class="muted">Sin actas todavía</span>'}</td></tr>`;
+  });
+  if (provs.length > 1) filas.push(`<tr><td><b>Total Catalunya</b><br><span class="muted">${SENADORES * provs.length} senadores</span></td><td>${chips(total) || '<span class="muted">Sin actas todavía</span>'}</td></tr>`);
   $('escanos').innerHTML = `<table class="tesc">${filas.join('')}</table>`;
 }
 
