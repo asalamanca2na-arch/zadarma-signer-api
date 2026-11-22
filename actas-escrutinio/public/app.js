@@ -619,7 +619,8 @@ $('b-enviar').addEventListener('click', async () => {
     const r = await api('/api/actas', { method: 'POST', body: envio });
     borrador.enviado = true;
     const u = envio.ubicacion;
-    if (r.duplicada) modal(`<div class="big">✅</div><h2 style="justify-content:center">Acta enviada</h2><p>Coincide con la que ya había enviado otra persona: <b>queda confirmada</b> y en los resultados cuenta una sola vez.</p><button class="btn" data-close>OK</button>`);
+    if (r.noPrioritaria) modal(`<div class="big">📨</div><h2 style="justify-content:center">Acta recibida</h2><p>Esta mesa ya tenía un acta <b>con foto</b> y con algún número distinto. La tuya queda guardada para que <b>el equipo la compare</b> con la foto.</p><p class="muted">${borrador?.foto ? '' : 'Consejo: envía siempre la foto del acta; las actas con foto tienen prioridad.'}</p><button class="btn" data-close>OK</button>`);
+    else if (r.duplicada) modal(`<div class="big">✅</div><h2 style="justify-content:center">Acta enviada</h2><p>Coincide con la que ya había enviado otra persona: <b>queda confirmada</b> y en los resultados cuenta una sola vez.</p><button class="btn" data-close>OK</button>`);
     else modal(`<div class="big">✅</div><h2 style="justify-content:center">Acta del ${nombreTipo(envio.tipo)} enviada</h2><p>${esc(u.municipio)} · Distrito ${esc(u.distrito)} · Sección ${esc(u.seccion)} · Mesa ${esc(u.mesa)}</p><button class="btn" data-close>OK</button>`);
     borrador = null;
     inicio();

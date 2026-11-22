@@ -230,7 +230,7 @@ function pintarActas(L) {
   const filas = L.filter((a) => (!soloInc || (a.incidencia && !a.revisada)) &&
     (!q || norm([a.municipio, a.colegio, a.distrito, a.seccion, a.mesa, a.enviadoPor?.nombre].join(' ')).includes(q)));
   $('t-act').innerHTML = `<thead><tr><th>Foto</th><th>Estado</th><th>Municipio</th><th>Colegio</th><th>Dist.</th><th>Secc.</th><th>Mesa</th><th class="n">Votantes</th><th>Avisos</th><th>Apoderado</th><th>Hora</th></tr></thead><tbody>` +
-    filas.map((a) => `<tr data-id="${esc(a.id)}"><td>${a.foto ? `<div class="row" style="gap:6px"><img class="mini" loading="lazy" src="${fotoUrl(a.foto)}" alt="Foto"><a class="dl" href="${fotoDescarga(a.foto)}" download="${esc(nombreFoto(a))}" title="Descargar la foto" data-nofila>⬇</a></div>` : '<span class="pill wait">Sin foto</span>'}</td><td>${a.revisada ? '<span class="pill ok">Verificada</span>' : a.incidencia ? '<span class="pill bad">Incidencia</span>' : '<span class="pill ok">OK</span>'}</td>
+    filas.map((a) => `<tr data-id="${esc(a.id)}"><td>${a.foto ? `<div class="row" style="gap:6px"><img class="mini" loading="lazy" src="${fotoUrl(a.foto)}" alt="Foto"><a class="dl" href="${fotoDescarga(a.foto)}" download="${esc(nombreFoto(a))}" title="Descargar la foto" data-nofila>⬇</a></div>` : '<span class="pill wait">Sin foto</span>'}</td><td>${a.revisada ? '<span class="pill ok">Verificada</span>' : a.incidencia ? '<span class="pill bad">Incidencia</span>' : '<span class="pill ok">OK</span>'}<div style="margin-top:4px">${iaPill(a)}</div></td>
       <td>${esc(a.municipio)}</td><td style="white-space:normal;min-width:140px">${esc(a.colegio)}</td><td>${esc(a.distrito)}</td><td>${esc(a.seccion)}</td><td>${esc(a.mesa)}</td><td class="n">${fmt(a.votantes)}</td>
       <td style="white-space:normal;min-width:180px">${esc((a.avisos || []).join(' · '))}${a.confirmaciones?.length ? ` <span class="pill ok">Confirmada ${a.confirmaciones.length + 1}×</span>` : ''}</td>
       <td>${esc(a.enviadoPor?.nombre || 'Sin nombre')}</td>
@@ -254,6 +254,9 @@ function tablaValores(a) {
   const ids = sen ? (datos.config.senado?.[a.provincia] || []).map((c) => c.id) : datos.config.partidos.filter((p) => a.votos && p.id in a.votos).map((p) => p.id);
   return [a.censo, a.votantes, a.nulos, a.blancos, ...ids.map((id) => a.votos?.[id] ?? 0)];
 }
+// Estado de la verificación de la foto por la IA.
+const IA_TXT = { coincide: ['ok', '🤖 Coincide'], difiere: ['bad', '🤖 No coincide'], pendiente: ['wait', '🤖 Verificando…'], error: ['wait', '🤖 Sin verificar'], no_es_acta: ['bad', '🤖 No es un acta'], ilegible: ['wait', '🤖 Ilegible'] };
+const iaPill = (v) => (!v.foto ? '<span class="pill wait">Sin foto</span>' : v.ia?.estado ? `<span class="pill ${IA_TXT[v.ia.estado][0]}">${IA_TXT[v.ia.estado][1]}</span>` : '');
 const fotoUrl = (f) => `/api/admin/foto?f=${encodeURIComponent(f)}&t=${encodeURIComponent(token)}`;
 const fotoDescarga = (f) => fotoUrl(f) + '&descargar=1';
 // Nombre del archivo al descargar una foto: congreso_Municipio_D02_S005_MA.jpg
@@ -265,7 +268,7 @@ async function verActa(id) {
   const sen = a.tipo === 'senado';
   const estado = a.cuadra ? (sen ? '✓ Datos coherentes' : '✓ Los votos cuadran') : '⚠ ' + (sen ? esc(a.avisos[0] || '') : a.diferencia > 0 ? `Faltan ${a.diferencia} votos` : `Sobran ${-a.diferencia} votos`);
   const hist = (a.historial || []).map((h, i) => `<div class="card version">
-      <div class="row"><div class="grow"><b>Versión anterior</b> · ${esc(h.enviadoPor?.nombre || 'Sin nombre')} · ${new Date(h.recibido).toLocaleString('es-ES')}</div>
+      <div class="row"><div class="grow"><b>Otra versión</b> · ${esc(h.enviadoPor?.nombre || 'Sin nombre')} · ${new Date(h.recibido).toLocaleString('es-ES')} ${iaPill(h)}</div>
       ${h.foto ? `<button class="btn ghost small" data-verfoto="${esc(h.foto)}">🖼 Ver su foto</button><a class="btn ghost small" href="${fotoDescarga(h.foto)}" download="${esc(nombreFoto({ ...a, ...h }, h.foto).replace(/(\.\w+)$/, '_version' + (i + 1) + '$1'))}">⬇ Descargar</a>` : ''}
       <button class="btn secondary small" data-usar="${i}">Usar esta versión</button></div>
       ${tablaVotos({ ...h, tipo: a.tipo, provincia: a.provincia }, a)}</div>`).join('');
@@ -282,6 +285,9 @@ async function verActa(id) {
         : '<p class="warn">Esta acta se envió <b>sin foto</b>: no se puede verificar con la imagen.</p>'}</div>
       <div>
         <div class="status ${a.cuadra ? 'ok' : 'bad'}">${estado}</div>
+        ${a.foto ? `<div class="ia-box ${a.ia?.estado || 'sin'}"><b>🤖 Verificación de la foto:</b> ${{ coincide: 'la IA ha leído la foto y <b>coincide</b> con los datos enviados.', difiere: '<b>no coincide</b> con los datos enviados:', pendiente: 'la IA la está leyendo… (unos segundos)', error: 'no se ha podido verificar.', no_es_acta: 'la foto <b>no parece un acta</b>.', ilegible: 'la IA no ha podido leer las cifras.' }[a.ia?.estado] || 'no activada (sin clave de IA).'}
+          ${a.ia?.estado === 'difiere' ? `<ul>${a.ia.diferencias.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>` : ''}</div>` : '<div class="ia-box sin"><b>📷 Sin foto:</b> no se puede verificar. Si llega otra versión con foto, tendrá prioridad.</div>'}
+        ${a.prioridad && (a.historial || []).length ? `<p class="muted" style="margin:6px 0">⭐ ${esc(a.prioridad)}.</p>` : ''}
         ${(a.avisos || []).length ? `<p class="warn" style="margin-top:10px">${a.avisos.map(esc).join('<br>')}</p>` : ''}
         ${a.observaciones ? `<p><b>Observaciones:</b> ${esc(a.observaciones)}</p>` : ''}
         ${(a.comentarios || []).length ? `<div class="coms"><b>💬 Comentarios de los apoderados</b>${a.comentarios.map((c) => `<div class="com ${c.leido ? 'leido' : ''}"><div>«${esc(c.texto)}»</div><div class="muted">${esc(c.nombre || 'Sin nombre')} · ${new Date(c.fecha).toLocaleString('es-ES')}${c.leido ? ' · revisado' : ' · <b>pendiente</b>'}</div></div>`).join('')}</div>` : ''}
@@ -289,7 +295,7 @@ async function verActa(id) {
           return rs.length ? `<div class="coms"><b>📝 Reclamaciones de esta mesa</b>${rs.map((r) => `<div class="com ${r.revisada ? 'leido' : ''}"><div>${esc(r.texto || '(sin texto, ver foto)')}</div><div class="muted">${esc(r.enviadoPor?.nombre || '')} · ${new Date(r.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} · <a href="#" data-verrecl="${esc(r.id)}">ver reclamación</a></div></div>`).join('')}</div>` : ''; })()}
         ${tablaVotos(a)}
         <p class="muted">Enviada por <b>${esc(a.enviadoPor?.nombre || 'Sin nombre')}</b> · ${new Date(a.recibido).toLocaleString('es-ES')}${conf ? `<br>✓ Confirmada con los mismos números por: ${conf}` : ''}</p>
-        ${hist ? `<details ${a.conflicto && !a.revisada ? 'open' : ''}><summary><b>⚠ ${a.historial.length} versión(es) anterior(es) con números distintos</b></summary>${hist}</details>` : ''}
+        ${hist ? `<details ${a.conflicto && !a.revisada ? 'open' : ''}><summary><b>⚠ ${a.historial.length} versión(es) más de esta mesa con números distintos</b> <span class="muted">(cuenta la que tiene más prioridad: foto verificada por la IA > foto > sin foto)</span></summary>${hist}</details>` : ''}
         <div style="height:10px"></div>
         <button class="btn ${a.revisada ? 'secondary' : ''}" id="m-rev" style="margin-bottom:10px">${a.revisada ? 'Quitar la marca de verificada' : '✓ Verificada: la foto y los datos coinciden'}</button>
         <button class="btn danger" id="m-del">🗑 Borrar esta acta</button>

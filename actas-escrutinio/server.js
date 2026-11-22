@@ -695,6 +695,8 @@ function calcula(a) {
   if (l23 && !m && !l23.includes(a.mesa)) avisos.push(`Mesa ${a.mesa} no existía en 2023 (había ${l23.split('').join(', ')})`);
   if (Object.keys(MUNICIPIOS).length && !municipioOficial(a.provincia, a.municipio) && !m) avisos.push('Municipio no reconocido');
   if (a.conflicto) avisos.push('Hay otra versión distinta del acta');
+  if (a.foto && a.ia?.estado === 'difiere') avisos.push(`🤖 La foto no coincide: ${(a.ia.diferencias || []).slice(0, 3).join('; ')}${(a.ia.diferencias || []).length > 3 ? '…' : ''}`);
+  if (a.foto && (a.ia?.estado === 'no_es_acta' || a.ia?.estado === 'ilegible')) avisos.push('🤖 ' + (a.ia.diferencias?.[0] || 'Foto no verificada'));
   const nRecl = reclDeActa(a).length;
   if (nRecl) avisos.push(`📝 Tiene ${nRecl} reclamación(es)`);
   if (a.observaciones) avisos.push('Tiene observaciones');
@@ -795,26 +797,32 @@ function guardarActa(body, user) {
     const yaTeniaFoto = !!previa.foto;
     if (!yaTeniaFoto && typeof body.foto === 'string' && body.foto.startsWith('data:image/')) {
       const m = body.foto.match(/^data:image\/(jpeg|png|webp);base64,(.+)$/);
-      if (m) { previa.foto = `${fileIdFor(id)}-${Date.now()}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`; fs.writeFileSync(path.join(FOTOS_DIR, previa.foto), Buffer.from(m[2], 'base64')); }
+      if (m) {
+        previa.foto = `${fileIdFor(id)}-${Date.now()}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`; fs.writeFileSync(path.join(FOTOS_DIR, previa.foto), Buffer.from(m[2], 'base64'));
+        previa.ia = lector.disponible() ? { estado: 'pendiente' } : null;
+        encolarVerificacion(id, previa.foto, m[2], 'image/' + m[1]);
+      }
     }
     (previa.confirmaciones ||= []).push({ nombre: user.nombre, dispositivo: user.dispositivo, recibido: new Date().toISOString() });
     writeJSON(path.join(ACTAS_DIR, fileIdFor(id) + '.json'), previa);
     return Object.assign(Object.create(null), previa, { duplicada: true });
   }
 
-  let foto = null;
+  let foto = null, fotoB64 = null, fotoTipo = null;
   if (typeof body.foto === 'string' && body.foto.startsWith('data:image/')) {
     const m = body.foto.match(/^data:image\/(jpeg|png|webp);base64,(.+)$/);
     if (m) {
       foto = `${fileIdFor(id)}-${Date.now()}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`;
       fs.writeFileSync(path.join(FOTOS_DIR, foto), Buffer.from(m[2], 'base64'));
+      fotoB64 = m[2]; fotoTipo = 'image/' + m[1];
     }
   }
 
   const acta = {
     id, tipo, ...ubic, colegio, ...datos,
     observaciones: String(body.observaciones || '').slice(0, 2000).trim(),
-    foto: foto || previa?.foto || null,
+    foto, // cada versión guarda solo su propia foto
+    ia: foto && lector.disponible() ? { estado: 'pendiente' } : null, // verificación de la foto por la IA
     enviadoPor: { nombre: user.nombre, dispositivo: user.dispositivo },
     recibido: new Date().toISOString(),
     clientId: body.clientId || null,
@@ -822,16 +830,120 @@ function guardarActa(body, user) {
     historial: [],
     conflicto: false,
   };
+  let final = acta;
   if (previa) {
     const { historial, ...anterior } = previa;
     acta.historial = [...(historial || []), anterior];
     acta.conflicto = true; // llega aquí solo si los números son distintos a los ya enviados
+    // Se conservan los datos del acta (confirmaciones, comentarios…) y se elige la versión con más prioridad.
+    Object.assign(acta, { confirmaciones: previa.confirmaciones, comentarios: previa.comentarios });
+    final = elegirVersion(acta);
   }
-  calcula(acta);
-  writeJSON(path.join(ACTAS_DIR, fileIdFor(id) + '.json'), acta);
-  actas.set(id, acta);
-  return acta;
+  calcula(final);
+  writeJSON(path.join(ACTAS_DIR, fileIdFor(id) + '.json'), final);
+  actas.set(id, final);
+  if (foto && fotoB64) encolarVerificacion(id, foto, fotoB64, fotoTipo);
+  // Lo que se devuelve al apoderado es su propia versión (aunque no sea la que cuenta).
+  return final === acta || final.foto === acta.foto && final.recibido === acta.recibido ? final : Object.assign(Object.create(null), final, { suyaNoPrioritaria: true });
 }
+
+// ---------- prioridad entre versiones de una misma mesa ----------
+// 3 = foto verificada por la IA (coincide) · 2 = foto pendiente/sin IA · 1 = foto que no coincide · 0 = sin foto.
+function puntos(v) {
+  if (!v.foto) return 0;
+  const e = v.ia?.estado;
+  if (e === 'coincide') return 3;
+  if (e === 'difiere' || e === 'no_es_acta') return 1;
+  return 2;
+}
+const CAMPOS_ACTA = ['id', 'tipo', 'provincia', 'municipio', 'distrito', 'seccion', 'mesa', 'confirmaciones', 'comentarios', 'revisada', 'conflicto', 'elegidaManual'];
+function elegirVersion(a) {
+  if (a.elegidaManual) return a; // el equipo eligió una versión a mano: se respeta
+  const { historial = [], ...actual } = a;
+  const todas = [actual, ...historial];
+  const mejor = [...todas].sort((x, y) => puntos(y) - puntos(x) || String(y.recibido).localeCompare(String(x.recibido)))[0];
+  const motivo = `Cuenta la versión ${mejor.foto ? (puntos(mejor) === 3 ? 'con foto verificada por la IA' : 'con foto') : 'más reciente'}`;
+  if (mejor === actual) return historial.length ? { ...a, prioridad: motivo } : a;
+  const comunes = Object.fromEntries(CAMPOS_ACTA.map((k) => [k, a[k]]));
+  const resto = todas.filter((v) => v !== mejor).sort((x, y) => String(x.recibido).localeCompare(String(y.recibido)))
+    .map((v) => { const c = { ...v }; for (const k of CAMPOS_ACTA) if (k !== 'colegio') delete c[k]; return c; });
+  return { ...mejor, ...comunes, historial: resto, prioridad: motivo };
+}
+
+// ---------- verificación de la foto por la IA ----------
+// Al publicarse un acta con foto, la IA la lee y se compara con los números enviados.
+// Si la foto ya se leyó desde el móvil (misma imagen), se reutiliza esa lectura y no se paga dos veces.
+const lecturasCache = new Map(); // sha1(foto) -> lectura normalizada
+const hashFoto = (b64) => crypto.createHash('sha1').update(b64).digest('hex');
+function guardarEnCache(h, L) { lecturasCache.set(h, L); if (lecturasCache.size > 3000) lecturasCache.delete(lecturasCache.keys().next().value); }
+async function leerConCache(b64, mediaType) {
+  const h = hashFoto(b64);
+  if (lecturasCache.has(h)) return lecturasCache.get(h);
+  const { datos } = await lector.leerActa({ fotoBase64: b64, mediaType, config, provincias: PROVINCIAS });
+  const L = normalizarLectura(datos);
+  guardarEnCache(h, L);
+  return L;
+}
+function compararConLectura(v, a, L) {
+  if (!L.esActa) return { estado: 'no_es_acta', diferencias: ['La foto no parece un acta'] };
+  const dif = [];
+  if (L.tipo && L.tipo !== (a.tipo === 'senado' ? 'senado' : 'congreso')) dif.push(`Tipo: la foto es del ${L.tipo === 'senado' ? 'Senado' : 'Congreso'}`);
+  for (const [k, nom] of [['distrito', 'Distrito'], ['seccion', 'Sección'], ['mesa', 'Mesa']]) if (L[k] && L[k] !== a[k]) dif.push(`${nom}: foto ${L[k]} / enviado ${a[k]}`);
+  let leidos = 0;
+  for (const [k, nom] of [['censo', 'Censo'], ['votantes', 'Votantes'], ['nulos', 'Nulos'], ['blancos', 'Blancos']]) {
+    if (L[k] == null) continue; leidos++;
+    if (L[k] !== v[k]) dif.push(`${nom}: foto ${L[k]} / enviado ${v[k]}`);
+  }
+  const nombres = Object.fromEntries([...config.partidos.map((p) => [p.id, p.nombre]), ...Object.values(config.senado || {}).flat().map((c) => [c.id, c.nombre])]);
+  for (const [id, n] of Object.entries(v.votos || {})) {
+    const f = L.votos?.[id];
+    if (f == null) continue; leidos++;
+    if (f !== n) dif.push(`${nombres[id] || id}: foto ${f} / enviado ${n}`);
+  }
+  if (!leidos) return { estado: 'ilegible', diferencias: ['La IA no ha podido leer las cifras de la foto'] };
+  return { estado: dif.length ? 'difiere' : 'coincide', diferencias: dif, dudas: L.dudas || '' };
+}
+const colaIA = []; let iaActivas = 0;
+function encolarVerificacion(id, foto, b64, mediaType) {
+  if (!lector.disponible()) return;
+  colaIA.push({ id, foto, b64, mediaType }); procesarColaIA();
+}
+// Versión (actual o anterior) de un acta que tiene una foto concreta.
+const versionConFoto = (a, foto) => (a.foto === foto ? a : (a.historial || []).find((h) => h.foto === foto));
+function procesarColaIA() {
+  while (iaActivas < 2 && colaIA.length) {
+    const t = colaIA.shift(); iaActivas++;
+    (async () => {
+      let ia;
+      try {
+        const L = await leerConCache(t.b64, t.mediaType);
+        const a = actas.get(t.id), v = a && versionConFoto(a, t.foto);
+        if (!v) return;
+        ia = compararConLectura(v, a, L);
+      } catch (e) {
+        console.error('[verificación IA]', t.id, e.message);
+        ia = { estado: 'error', diferencias: ['No se ha podido verificar la foto'] };
+      }
+      ia.fecha = new Date().toISOString();
+      // El acta puede haber cambiado mientras la IA leía: se busca de nuevo la versión con esa foto.
+      const a = actas.get(t.id), v = a && versionConFoto(a, t.foto);
+      if (!v) return;
+      v.ia = ia;
+      const nueva = elegirVersion(a);
+      calcula(nueva);
+      writeJSON(path.join(ACTAS_DIR, fileIdFor(nueva.id) + '.json'), nueva);
+      actas.set(nueva.id, nueva);
+    })().finally(() => { iaActivas--; procesarColaIA(); });
+  }
+}
+// Al arrancar: verificar las fotos que quedaron pendientes (por ejemplo, tras un reinicio).
+setTimeout(() => {
+  for (const a of actas.values()) for (const v of [a, ...(a.historial || [])]) {
+    if (v.foto && v.ia?.estado === 'pendiente') {
+      try { const b64 = fs.readFileSync(path.join(FOTOS_DIR, v.foto)).toString('base64'); encolarVerificacion(a.id, v.foto, b64, MIME[path.extname(v.foto)] || 'image/jpeg'); } catch {}
+    }
+  }
+}, 3000);
 
 // Ajusta lo leído por la IA a los nombres y formatos de la app (municipio oficial, distrito 2 cifras, etc.).
 function normalizarLectura(d) {
@@ -882,11 +994,11 @@ function clavesExport(tipo) {
 function csvActas(tipo, f) {
   const claves = clavesExport(tipo);
   const cols = ['provincia', 'municipio', 'colegio', 'distrito', 'seccion', 'mesa', 'censo', 'votantes', tipo === 'senado' ? 'papeletas_nulas' : 'nulos', tipo === 'senado' ? 'papeletas_blanco' : 'blancos',
-    ...claves.map((c) => c.titulo), 'correcta', 'verificada', 'avisos', 'observaciones', 'enviado_por', 'confirmada_por', 'recibido', 'foto'];
+    ...claves.map((c) => c.titulo), 'correcta', 'verificada', 'foto_verificada_ia', 'avisos', 'observaciones', 'enviado_por', 'confirmada_por', 'recibido', 'foto'];
   const lines = [cols.map(csvCell).join(';')];
   for (const a of actasFiltradas(f, tipo)) {
     lines.push([a.provincia, a.municipio, a.colegio, a.distrito, a.seccion, a.mesa, a.censo, a.votantes, a.nulos, a.blancos,
-      ...claves.map((c) => a.votos[c.id] ?? ''), a.cuadra ? 'SI' : 'NO', a.revisada ? 'SI' : 'NO', (a.avisos || []).join(' | '), a.observaciones,
+      ...claves.map((c) => a.votos[c.id] ?? ''), a.cuadra ? 'SI' : 'NO', a.revisada ? 'SI' : 'NO', !a.foto ? 'SIN FOTO' : ({ coincide: 'COINCIDE', difiere: 'NO COINCIDE', pendiente: 'PENDIENTE', error: 'ERROR', no_es_acta: 'NO ES ACTA', ilegible: 'ILEGIBLE' }[a.ia?.estado] || 'SIN IA'), (a.avisos || []).join(' | '), a.observaciones,
       a.enviadoPor?.nombre, (a.confirmaciones || []).map((c) => c.nombre).join(', '), new Date(a.recibido).toLocaleString('es-ES'), a.foto ? nombreFoto(a) + path.extname(a.foto) : ''].map(csvCell).join(';'));
   }
   return '\uFEFF' + lines.join('\r\n');
@@ -1068,10 +1180,14 @@ async function handle(req, res) {
     const b = await readBody(req);
     const mm = typeof b.foto === 'string' && b.foto.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
     if (!mm) return send(res, 400, { error: 'Falta la foto' });
+    const h = hashFoto(mm[2]);
+    if (lecturasCache.has(h)) return send(res, 200, { ok: true, lectura: lecturasCache.get(h) });
     const t0 = Date.now();
     const { datos, uso } = await lector.leerActa({ fotoBase64: mm[2], mediaType: mm[1], config, provincias: PROVINCIAS });
     console.log(`[lectura] ${Date.now() - t0} ms · tokens entrada ${uso?.input_tokens} salida ${uso?.output_tokens}`);
-    return send(res, 200, { ok: true, lectura: normalizarLectura(datos) });
+    const L = normalizarLectura(datos);
+    guardarEnCache(h, L);
+    return send(res, 200, { ok: true, lectura: L });
   }
   if (p === '/api/reclamaciones' && m === 'POST') {
     if (rateLimitedEnvios(clientIp(req))) return send(res, 429, { error: 'Demasiados envíos seguidos. Espera unos minutos.' });
@@ -1083,7 +1199,7 @@ async function handle(req, res) {
     if (rateLimitedEnvios(clientIp(req))) return send(res, 429, { error: 'Demasiados envíos seguidos. Espera unos minutos.' });
     const b = await readBody(req);
     const a = guardarActa(b, { nombre: String(b.nombre || '').trim().slice(0, 80), dispositivo });
-    return send(res, 200, { ok: true, duplicada: !!a.duplicada, acta: resumenActa(a) });
+    return send(res, 200, { ok: true, duplicada: !!a.duplicada, noPrioritaria: !!a.suyaNoPrioritaria, acta: resumenActa(a) });
   }
   if (p === '/api/existe' && m === 'GET') {
     const q = Object.fromEntries(url.searchParams);
@@ -1174,7 +1290,7 @@ async function handle(req, res) {
       if (!a || !a.historial?.[i]) return send(res, 404, { error: 'No existe esa versión' });
       const { historial, ...actual } = a;
       const elegida = historial[i];
-      const nueva = { ...elegida, id: a.id, tipo: a.tipo, historial: [...historial.filter((_, j) => j !== i), actual], conflicto: true, revisada: true, confirmaciones: a.confirmaciones };
+      const nueva = { ...elegida, id: a.id, tipo: a.tipo, historial: [...historial.filter((_, j) => j !== i), actual].map(({ elegidaManual, prioridad, ...v }) => v), conflicto: true, revisada: true, confirmaciones: a.confirmaciones, comentarios: a.comentarios, elegidaManual: true, prioridad: 'Versión elegida por el equipo' };
       calcula(nueva);
       writeJSON(path.join(ACTAS_DIR, fileIdFor(a.id) + '.json'), nueva);
       actas.set(a.id, nueva);

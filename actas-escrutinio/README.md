@@ -37,6 +37,13 @@ El apoderado solo revisa: las casillas que no se han podido leer salen vacías y
 Sin la variable, la app funciona igual pero los datos se escriben a mano. La clave se crea en console.anthropic.com → API Keys
 y se pone en Render → Environment. Coste orientativo: unos pocos céntimos por acta leída.
 
+## Prioridad entre versiones y verificación de la foto por IA
+
+Si llegan varias actas distintas de la misma mesa, cuenta la de más prioridad: **foto verificada por la IA** (la IA lee la
+foto al publicarse y coincide con los datos enviados) > foto pendiente de verificar > foto que no coincide > **sin foto**.
+A igual prioridad, la más reciente. Las demás quedan como versiones y el acta sale como incidencia; el equipo puede elegir
+otra a mano («Usar esta versión») y se respeta. Si la foto ya se leyó desde el móvil, se reutiliza esa lectura (no se paga dos veces).
+
 ## Reclamaciones
 
 Los apoderados pueden subir **escritos de reclamación** (voto impugnado, anomalías…) con su foto: botón «📝 Foto de la reclamación»
