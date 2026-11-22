@@ -225,6 +225,7 @@ function pintarPendientes(L) {
 }
 
 function pintarActas(L) {
+  $('b-borrar-tipo').textContent = `🗑 Borrar todas las actas del ${tipo === 'senado' ? 'Senado' : 'Congreso'}`;
   const q = norm($('f-q').value);
   const soloInc = $('f-inc').checked;
   const filas = L.filter((a) => (!soloInc || (a.incidencia && !a.revisada)) &&
@@ -470,14 +471,19 @@ async function subirCSV(fileId, url, msgId, extra = {}) {
     cargarConfig(); refrescar();
   } catch (e) { $(msgId).textContent = '⚠ ' + e.message + (e.data?.errores?.length ? ' — ' + e.data.errores.slice(0, 3).join('; ') : ''); }
 }
-// Borrar todas las actas y reclamaciones de una vez (con una sola confirmación).
-function borrarTodas() {
-  const nA = datos?.actas.length || 0, nR = datos?.reclamaciones?.length || 0;
+// Borrar de una vez: las actas del Congreso, las del Senado, las reclamaciones o todo (una sola confirmación).
+function borrar(que) {
+  const nC = datos?.actas.filter((x) => tipoDe(x) === 'congreso').length || 0, nS = (datos?.actas.length || 0) - nC, nR = datos?.reclamaciones?.length || 0;
+  const T = {
+    congreso: ['¿Borrar todas las actas del Congreso?', `Se borrarán <b>${fmt(nC)} actas del Congreso</b> con sus fotos. Las del Senado y las reclamaciones no se tocan.`],
+    senado: ['¿Borrar todas las actas del Senado?', `Se borrarán <b>${fmt(nS)} actas del Senado</b> con sus fotos. Las del Congreso y las reclamaciones no se tocan.`],
+    reclamaciones: ['¿Borrar todas las reclamaciones?', `Se borrarán <b>${fmt(nR)} reclamaciones</b> con sus fotos. Las actas no se tocan.`],
+    todo: ['¿Borrar todo?', `Se borrarán <b>${fmt(nC)} actas del Congreso</b>, <b>${fmt(nS)} del Senado</b> y <b>${fmt(nR)} reclamaciones</b>, con sus fotos.`],
+  }[que];
   $('modal-box').style.maxWidth = '520px';
-  $('modal-box').innerHTML = `<div style="text-align:center"><div style="font-size:3rem">🗑</div><h2 style="justify-content:center;margin:6px 0">¿Borrar todas las actas?</h2>
-    <p>Se borrarán <b>${fmt(nA)} actas</b> (Congreso y Senado) y <b>${fmt(nR)} reclamaciones</b>, con sus fotos. Los resultados quedarán a cero.</p>
-    <p class="muted">Úsalo para quitar las pruebas antes de la noche electoral. Si quieres conservar algo, descárgalo antes en «⬇ Descargas».</p>
-    <button class="btn danger" id="bt-si" style="margin-top:8px">Sí, borrar todo</button><button class="btn secondary" id="bt-no" style="margin-top:8px">Cancelar</button>
+  $('modal-box').innerHTML = `<div style="text-align:center"><div style="font-size:3rem">🗑</div><h2 style="justify-content:center;margin:6px 0">${T[0]}</h2>
+    <p>${T[1]}</p><p class="muted">Úsalo para quitar las pruebas antes de la noche electoral. Si quieres conservar algo, descárgalo antes en «⬇ Descargas».</p>
+    <button class="btn danger" id="bt-si" style="margin-top:8px">Sí, borrar</button><button class="btn secondary" id="bt-no" style="margin-top:8px">Cancelar</button>
     <p id="bt-msg" class="muted"></p></div>`;
   $('modal').classList.add('open');
   const cerrar = () => { $('modal').classList.remove('open'); $('modal-box').style.maxWidth = ''; };
@@ -485,15 +491,16 @@ function borrarTodas() {
   $('bt-si').onclick = async () => {
     $('bt-si').disabled = true; $('bt-si').textContent = 'Borrando…';
     try {
-      const r = await api('/api/admin/borrar-todas', { method: 'POST', body: { confirmacion: 'BORRAR' } });
-      const txt = `✓ ${fmt(r.borradas)} actas y ${fmt(r.reclamaciones || 0)} reclamaciones borradas`;
-      if ($('c-borrar-msg')) $('c-borrar-msg').textContent = txt;
+      const r = await api('/api/admin/borrar-todas', { method: 'POST', body: { confirmacion: 'BORRAR', que } });
+      const txt = que === 'reclamaciones' ? `✓ ${fmt(r.reclamaciones)} reclamaciones borradas` : que === 'todo' ? `✓ ${fmt(r.borradas)} actas y ${fmt(r.reclamaciones)} reclamaciones borradas` : `✓ ${fmt(r.borradas)} actas del ${que === 'senado' ? 'Senado' : 'Congreso'} borradas`;
+      if (que === 'todo' && $('c-borrar-msg')) $('c-borrar-msg').textContent = txt;
       cerrar(); await refrescar(); alert(txt);
-    } catch (e) { $('bt-msg').textContent = '⚠ ' + e.message; $('bt-si').disabled = false; $('bt-si').textContent = 'Sí, borrar todo'; }
+    } catch (e) { $('bt-msg').textContent = '⚠ ' + e.message; $('bt-si').disabled = false; $('bt-si').textContent = 'Sí, borrar'; }
   };
 }
-$('b-borrar-todas').addEventListener('click', borrarTodas);
-$('b-borrar-todas-2').addEventListener('click', borrarTodas);
+$('b-borrar-todas').addEventListener('click', () => borrar('todo'));
+$('b-borrar-tipo').addEventListener('click', () => borrar(tipo));
+$('b-borrar-recl').addEventListener('click', () => borrar('reclamaciones'));
 $('b-dist').addEventListener('click', () => subirCSV('c-dist-file', '/api/admin/distritos', 'c-dist-msg'));
 $('b-dist-csv').addEventListener('click', (e) => { e.preventDefault(); location.href = '/api/admin/distritos.csv?t=' + encodeURIComponent(token); });
 $('b-mesas').addEventListener('click', () => subirCSV('c-mesas-file', '/api/admin/mesas', 'c-mesas-msg'));

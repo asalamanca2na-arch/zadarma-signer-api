@@ -1347,10 +1347,13 @@ async function handle(req, res) {
     if (p === '/api/admin/borrar-todas' && m === 'POST') {
       const b = await readBody(req);
       if (b.confirmacion !== 'BORRAR') return send(res, 400, { error: 'Escribe BORRAR para confirmar' });
-      const n = actas.size, nr = reclamaciones.size;
-      aPapelera([...actas.values()]);
-      reclPapelera([...reclamaciones.values()]);
-      return send(res, 200, { ok: true, borradas: n, reclamaciones: nr });
+      // que: 'congreso' | 'senado' (solo esas actas) | 'reclamaciones' | 'todo' (por defecto)
+      const que = ['congreso', 'senado', 'reclamaciones'].includes(b.que) ? b.que : 'todo';
+      const la = que === 'reclamaciones' ? [] : [...actas.values()].filter((a) => que === 'todo' || (a.tipo === 'senado' ? 'senado' : 'congreso') === que);
+      const lr = que === 'todo' || que === 'reclamaciones' ? [...reclamaciones.values()] : [];
+      if (la.length) aPapelera(la);
+      if (lr.length) reclPapelera(lr);
+      return send(res, 200, { ok: true, borradas: la.length, reclamaciones: lr.length });
     }
     if (p === '/api/admin/foto' && m === 'GET') {
       const f = path.basename(url.searchParams.get('f') || '');

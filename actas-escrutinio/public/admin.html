@@ -127,7 +127,7 @@
         <div class="filters">
           <div><label for="f-q">Buscar</label><input id="f-q" placeholder="Colegio, sección, mesa, apoderado…"></div>
           <div><label class="checkline"><input type="checkbox" id="f-inc"> Solo incidencias sin revisar</label></div>
-          <div style="flex:0 0 auto;margin-left:auto"><button class="btn danger small" id="b-borrar-todas-2">🗑 Borrar todas las actas</button></div>
+          <div style="flex:0 0 auto;margin-left:auto"><button class="btn danger small" id="b-borrar-tipo">🗑 Borrar todas las actas del Congreso</button></div>
         </div>
         <div class="tablewrap" style="margin-top:10px"><table id="t-act"></table></div>
       </div>
@@ -142,6 +142,7 @@
       <div class="card">
         <div class="filters">
           <div><label class="checkline"><input type="checkbox" id="f-recl-pend"> Solo sin revisar</label></div>
+          <div style="flex:0 0 auto;margin-left:auto"><button class="btn danger small" id="b-borrar-recl">🗑 Borrar todas las reclamaciones</button></div>
         </div>
         <div class="tablewrap" style="margin-top:10px"><table id="t-rec"></table></div>
       </div>
@@ -180,7 +181,7 @@
       <div class="card">
         <h2>🗑 Borrar actas de prueba</h2>
         <p class="muted">Úsalo <b>antes de la noche electoral</b> para empezar de cero después de las pruebas. Una sola acta se borra desde su ficha.</p>
-        <button class="btn danger small" id="b-borrar-todas">Borrar todas las actas</button> <span id="c-borrar-msg" class="muted"></span>
+        <button class="btn danger small" id="b-borrar-todas">Borrar todo (actas del Congreso y del Senado y reclamaciones)</button> <span id="c-borrar-msg" class="muted"></span>
       </div>
     </div>
   </section>
