@@ -162,12 +162,16 @@ function verMiReclamacion(r) {
 }
 
 // ---------- reclamaciones: foto → mesa → texto → enviar ----------
-function nuevaReclamacion(conFoto) {
+// origen: 'camara' (hacer foto), 'galeria' (foto ya hecha) o null (sin foto).
+function nuevaReclamacion(origen) {
   nuevoBorrador(null); borrador.clase = 'reclamacion';
-  if (conFoto) $('i-camara').click(); else irUbicacion();
+  if (origen === 'camara') $('i-camara').click();
+  else if (origen === 'galeria') $('i-galeria').click();
+  else irUbicacion();
 }
-$('b-recl-foto').addEventListener('click', () => nuevaReclamacion(true));
-$('b-recl-sinfoto').addEventListener('click', () => nuevaReclamacion(false));
+$('b-recl-foto').addEventListener('click', () => nuevaReclamacion('camara'));
+$('b-recl-galeria').addEventListener('click', () => nuevaReclamacion('galeria'));
+$('b-recl-sinfoto').addEventListener('click', () => nuevaReclamacion(null));
 function irReclamacion() {
   const u = borrador.ubicacion, L = borrador.lectura;
   $('r-mun').textContent = `${u.municipio} (${u.provincia})`;
