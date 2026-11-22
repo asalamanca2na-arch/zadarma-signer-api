@@ -1,5 +1,5 @@
 // Guarda la app en el móvil para que abra aunque no haya cobertura.
-const CACHE = 'actas-v13';
+const CACHE = 'actas-v14';
 const FILES = ['/', '/index.html', '/app.js', '/styles.css', '/icon.svg', '/icon-192.png', '/apple-touch-icon.png', '/manifest.webmanifest'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', (e) => {

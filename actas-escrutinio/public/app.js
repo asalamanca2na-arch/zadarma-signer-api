@@ -358,13 +358,13 @@ $('b-ubic-ok').addEventListener('click', async () => {
 });
 function avisoYaEnviada(ex, u) {
   const hora = new Date(ex.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-  const quien = ex.mia ? 'tú mismo/a' : `<b>${esc(ex.nombre || 'otro apoderado')}</b>`;
-  modal(`<div class="big">📋</div><h2 style="justify-content:center">Esta acta ya está enviada</h2>
-    <p>El acta del <b>${nombreTipo(borrador.tipo)}</b> de la mesa <b>${esc(u.municipio)} · Dist. ${Number(u.distrito)} · Secc. ${Number(u.seccion)} · Mesa ${esc(u.mesa)}</b> ya la envió ${quien} a las ${hora}.</p>
-    <p class="muted">No hace falta enviarla otra vez. Si comparando con el acta ves que algún número está mal, puedes enviar la corrección: quedará marcada para que la revise el equipo.</p>
-    <button class="btn" id="b-ya-ok">De acuerdo, no la envío</button><button class="btn secondary" id="b-ya-corregir">Enviar una corrección</button>`, { cerrar: false });
-  $('b-ya-ok').onclick = () => { cerrarModal(); borrador = null; inicio(); };
-  $('b-ya-corregir').onclick = () => { cerrarModal(); irVotos(); };
+  const quien = ex.mia ? 'desde este móvil' : `por <b>${esc(ex.nombre || 'otro apoderado')}</b>`;
+  modal(`<div class="big">ℹ️</div><h2 style="justify-content:center">Esta mesa ya tiene acta</h2>
+    <p>El acta del <b>${nombreTipo(borrador.tipo)}</b> de <b>${esc(u.municipio)} · Dist. ${Number(u.distrito)} · Secc. ${Number(u.seccion)} · Mesa ${esc(u.mesa)}</b> ya se envió ${quien} a las ${hora}.</p>
+    <p class="muted">Puedes enviarla igualmente: <b>en los resultados cuenta una sola vez</b>. Si tus números coinciden, sirve de confirmación; si alguno es distinto, el equipo la revisará.</p>
+    <button class="btn" id="b-ya-enviar">Enviar igualmente</button><button class="btn secondary" id="b-ya-no">No enviar</button>`, { cerrar: false });
+  $('b-ya-enviar').onclick = () => { cerrarModal(); irVotos(); };
+  $('b-ya-no').onclick = () => { cerrarModal(); borrador = null; inicio(); };
 }
 
 // ---------- paso 2: votos ----------
@@ -491,7 +491,7 @@ $('b-enviar').addEventListener('click', async () => {
     const r = await api('/api/actas', { method: 'POST', body: envio });
     borrador.enviado = true;
     const u = envio.ubicacion;
-    if (r.duplicada) modal(`<div class="big">👍</div><h2 style="justify-content:center">Ya estaba enviada</h2><p>Esta acta ya la había enviado otra persona con <b>los mismos números</b>. No se ha duplicado: cuenta una sola vez.</p><button class="btn" data-close>OK</button>`);
+    if (r.duplicada) modal(`<div class="big">✅</div><h2 style="justify-content:center">Acta enviada</h2><p>Coincide con la que ya había enviado otra persona: <b>queda confirmada</b> y en los resultados cuenta una sola vez.</p><button class="btn" data-close>OK</button>`);
     else modal(`<div class="big">✅</div><h2 style="justify-content:center">Acta del ${nombreTipo(envio.tipo)} enviada</h2><p>${esc(u.municipio)} · Distrito ${esc(u.distrito)} · Sección ${esc(u.seccion)} · Mesa ${esc(u.mesa)}</p><button class="btn" data-close>OK</button>`);
     borrador = null;
     inicio();
