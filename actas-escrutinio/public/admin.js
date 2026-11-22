@@ -70,8 +70,6 @@ function pintar() {
   const { config } = datos;
   $('p-eleccion').textContent = config.eleccion;
   $('p-upd').textContent = 'Actualizado ' + new Date(datos.actualizado).toLocaleTimeString('es-ES');
-  $('b-csv').href = `/api/admin/export.csv?tipo=${tipo}&t=` + encodeURIComponent(token);
-  $('b-csv').textContent = `⬇ Exportar CSV (${tipo === 'senado' ? 'Senado' : 'Congreso'})`;
 
   // filtros
   const provs = ['Barcelona', 'Girona', 'Lleida', 'Tarragona'];
@@ -231,13 +229,13 @@ function pintarActas(L) {
   const filas = L.filter((a) => (!soloInc || (a.incidencia && !a.revisada)) &&
     (!q || norm([a.municipio, a.colegio, a.distrito, a.seccion, a.mesa, a.enviadoPor?.nombre].join(' ')).includes(q)));
   $('t-act').innerHTML = `<thead><tr><th>Foto</th><th>Estado</th><th>Municipio</th><th>Colegio</th><th>Dist.</th><th>Secc.</th><th>Mesa</th><th class="n">Votantes</th><th>Avisos</th><th>Apoderado</th><th>Hora</th></tr></thead><tbody>` +
-    filas.map((a) => `<tr data-id="${esc(a.id)}"><td>${a.foto ? `<img class="mini" loading="lazy" src="${fotoUrl(a.foto)}" alt="Foto">` : '<span class="pill wait">Sin foto</span>'}</td><td>${a.revisada ? '<span class="pill ok">Verificada</span>' : a.incidencia ? '<span class="pill bad">Incidencia</span>' : '<span class="pill ok">OK</span>'}</td>
+    filas.map((a) => `<tr data-id="${esc(a.id)}"><td>${a.foto ? `<div class="row" style="gap:6px"><img class="mini" loading="lazy" src="${fotoUrl(a.foto)}" alt="Foto"><a class="dl" href="${fotoDescarga(a.foto)}" download="${esc(nombreFoto(a))}" title="Descargar la foto" data-nofila>⬇</a></div>` : '<span class="pill wait">Sin foto</span>'}</td><td>${a.revisada ? '<span class="pill ok">Verificada</span>' : a.incidencia ? '<span class="pill bad">Incidencia</span>' : '<span class="pill ok">OK</span>'}</td>
       <td>${esc(a.municipio)}</td><td style="white-space:normal;min-width:140px">${esc(a.colegio)}</td><td>${esc(a.distrito)}</td><td>${esc(a.seccion)}</td><td>${esc(a.mesa)}</td><td class="n">${fmt(a.votantes)}</td>
       <td style="white-space:normal;min-width:180px">${esc((a.avisos || []).join(' · '))}${a.confirmaciones?.length ? ` <span class="pill ok">Confirmada ${a.confirmaciones.length + 1}×</span>` : ''}</td>
       <td>${esc(a.enviadoPor?.nombre || 'Sin nombre')}</td>
       <td>${new Date(a.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</td></tr>`).join('') +
     (filas.length ? '' : '<tr><td colspan="11" class="muted">No hay actas.</td></tr>') + '</tbody>';
-  $('t-act').querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => verActa(tr.dataset.id)));
+  $('t-act').querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', (e) => { if (!e.target.closest('[data-nofila]')) verActa(tr.dataset.id); }));
 }
 ['f-prov', 'f-mun'].forEach((id) => $(id).addEventListener('input', () => datos && pintar()));
 ['f-q', 'f-inc'].forEach((id) => $(id).addEventListener('input', () => datos && pintarActas(filtradas())));
@@ -256,13 +254,18 @@ function tablaValores(a) {
   return [a.censo, a.votantes, a.nulos, a.blancos, ...ids.map((id) => a.votos?.[id] ?? 0)];
 }
 const fotoUrl = (f) => `/api/admin/foto?f=${encodeURIComponent(f)}&t=${encodeURIComponent(token)}`;
+const fotoDescarga = (f) => fotoUrl(f) + '&descargar=1';
+// Nombre del archivo al descargar una foto: congreso_Municipio_D02_S005_MA.jpg
+const nombreFoto = (a, f = a.foto) => `${a.tipo === 'senado' ? 'senado' : 'congreso'}_${a.municipio}_D${a.distrito}_S${a.seccion}_M${a.mesa}`
+  .replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-') + (String(f).match(/\.\w+$/)?.[0] || '.jpg');
 async function verActa(id) {
   const a = await api('/api/admin/acta?id=' + encodeURIComponent(id));
+  $('modal-box').style.maxWidth = '';
   const sen = a.tipo === 'senado';
   const estado = a.cuadra ? (sen ? '✓ Datos coherentes' : '✓ Los votos cuadran') : '⚠ ' + (sen ? esc(a.avisos[0] || '') : a.diferencia > 0 ? `Faltan ${a.diferencia} votos` : `Sobran ${-a.diferencia} votos`);
   const hist = (a.historial || []).map((h, i) => `<div class="card version">
       <div class="row"><div class="grow"><b>Versión anterior</b> · ${esc(h.enviadoPor?.nombre || 'Sin nombre')} · ${new Date(h.recibido).toLocaleString('es-ES')}</div>
-      ${h.foto ? `<button class="btn ghost small" data-verfoto="${esc(h.foto)}">🖼 Ver su foto</button>` : ''}
+      ${h.foto ? `<button class="btn ghost small" data-verfoto="${esc(h.foto)}">🖼 Ver su foto</button><a class="btn ghost small" href="${fotoDescarga(h.foto)}" download="${esc(nombreFoto({ ...a, ...h }, h.foto).replace(/(\.\w+)$/, '_version' + (i + 1) + '$1'))}">⬇ Descargar</a>` : ''}
       <button class="btn secondary small" data-usar="${i}">Usar esta versión</button></div>
       ${tablaVotos({ ...h, tipo: a.tipo, provincia: a.provincia }, a)}</div>`).join('');
   const conf = (a.confirmaciones || []).map((c) => `${esc(c.nombre || 'Sin nombre')} (${new Date(c.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })})`).join(', ');
@@ -272,7 +275,8 @@ async function verActa(id) {
         <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">
           <button class="btn secondary small" data-zoom="1.25">🔍 +</button><button class="btn secondary small" data-zoom="0.8">🔍 −</button>
           <button class="btn secondary small" id="v-rot">↻ Girar</button><button class="btn secondary small" id="v-reset">Ajustar</button>
-          <a class="btn ghost small" href="${fotoUrl(a.foto)}" target="_blank">Abrir en otra pestaña ↗</a></div>
+          <a class="btn small" id="v-descargar" href="${fotoDescarga(a.foto)}" download="${esc(nombreFoto(a))}">⬇ Descargar foto</a>
+          <a class="btn ghost small" id="v-abrir" href="${fotoUrl(a.foto)}" target="_blank">Abrir en otra pestaña ↗</a></div>
         <p class="muted" style="margin:6px 0 0">Compara cada cifra de la foto con los datos de la derecha. Con la rueda del ratón también se hace zoom y arrastrando se mueve.</p>`
         : '<p class="warn">Esta acta se envió <b>sin foto</b>: no se puede verificar con la imagen.</p>'}</div>
       <div>
@@ -290,7 +294,9 @@ async function verActa(id) {
   $('modal').classList.add('open');
   $('m-close').onclick = () => $('modal').classList.remove('open');
   if (a.foto) visor($('visor'), $('visor-img'));
-  $('modal-box').querySelectorAll('[data-verfoto]').forEach((b) => (b.onclick = () => { $('visor-img').src = fotoUrl(b.dataset.verfoto); }));
+  $('modal-box').querySelectorAll('[data-verfoto]').forEach((b) => (b.onclick = () => {
+    $('visor-img').src = fotoUrl(b.dataset.verfoto); $('v-descargar').href = fotoDescarga(b.dataset.verfoto); $('v-abrir').href = fotoUrl(b.dataset.verfoto);
+  }));
   $('modal-box').querySelectorAll('[data-usar]').forEach((b) => (b.onclick = async () => {
     if (!confirm('¿Usar esta versión anterior como la buena? La actual pasará al historial.')) return;
     await api('/api/admin/acta/version', { method: 'POST', body: { id: a.id, indice: Number(b.dataset.usar) } });
@@ -320,6 +326,35 @@ function visor(caja, img) {
   caja.addEventListener('pointerup', () => { arr = null; });
 }
 $('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') $('modal').classList.remove('open'); });
+
+// ---------- descargas ----------
+$('b-descargas').addEventListener('click', () => {
+  const prov = $('f-prov').value, mun = $('f-mun').value.trim();
+  const filtro = prov || mun;
+  const cuenta = (soloFiltro) => datos.actas.filter((a) => !soloFiltro || ((!prov || a.provincia === prov) && (!mun || norm(a.municipio) === norm(mun))));
+  const url = (q, soloFiltro) => `/api/admin/descarga.zip?${q}${soloFiltro ? `&provincia=${encodeURIComponent(prov)}&municipio=${encodeURIComponent(mun)}` : ''}&t=${encodeURIComponent(token)}`;
+  const pinta = () => {
+    const sf = filtro && $('d-filtro')?.checked;
+    const A = cuenta(sf), F = A.filter((a) => a.foto).length;
+    const nC = A.filter((a) => tipoDe(a) === 'congreso').length, nS = A.length - nC;
+    $('d-opciones').innerHTML = `
+      <a class="dopc" href="${url('datos=1', sf)}"><span class="big">📊</span><div><b>Todos los datos</b><br><span class="muted">${fmt(nC)} actas del Congreso y ${fmt(nS)} del Senado, con todos los votos, y los resultados por municipio. Se abren con Excel.</span></div></a>
+      <a class="dopc" href="${url('fotos=1', sf)}"><span class="big">🖼️</span><div><b>Todas las fotos</b><br><span class="muted">${fmt(F)} fotos en un ZIP, en carpetas por Congreso/Senado, provincia y municipio.</span></div></a>
+      <a class="dopc" href="${url('datos=1&fotos=1', sf)}"><span class="big">📦</span><div><b>Todo junto</b><br><span class="muted">Datos y fotos en un solo ZIP. Ideal como copia de seguridad.</span></div></a>
+      <div class="row" style="gap:8px;margin-top:6px"><span class="muted">Solo un tipo, en CSV:</span>
+        <a class="btn ghost small" href="/api/admin/export.csv?tipo=congreso${sf ? `&provincia=${encodeURIComponent(prov)}&municipio=${encodeURIComponent(mun)}` : ''}&t=${encodeURIComponent(token)}">Congreso</a>
+        <a class="btn ghost small" href="/api/admin/export.csv?tipo=senado${sf ? `&provincia=${encodeURIComponent(prov)}&municipio=${encodeURIComponent(mun)}` : ''}&t=${encodeURIComponent(token)}">Senado</a></div>`;
+  };
+  $('modal-box').innerHTML = `<div class="topbar"><div class="title"><h2 style="margin:0">⬇ Descargas</h2></div><button class="btn ghost small" id="m-close">✕</button></div>
+    ${filtro ? `<label class="checkline" style="margin:0 0 6px"><input type="checkbox" id="d-filtro" checked> Solo ${esc([mun, prov].filter(Boolean).join(', '))} (el filtro de arriba)</label>` : ''}
+    <div id="d-opciones"></div>
+    <p class="muted" style="margin-bottom:0">Con muchas fotos el ZIP puede tardar un poco en empezar a bajar.</p>`;
+  $('modal-box').style.maxWidth = '640px';
+  $('modal').classList.add('open');
+  $('m-close').onclick = () => { $('modal').classList.remove('open'); $('modal-box').style.maxWidth = ''; };
+  if ($('d-filtro')) $('d-filtro').onchange = pinta;
+  pinta();
+});
 
 // ---------- configuración ----------
 async function cargarConfig() {

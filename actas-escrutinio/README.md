@@ -21,6 +21,9 @@ El panel tiene un selector **Congreso / Senado** que cambia resultados, actas y 
 
 - **Proyección de escaños del Congreso** por provincia (D'Hondt, mínimo 3 %): Barcelona 32, Girona 6, Lleida 4, Tarragona 6.
 - **Tabla por municipio** con la columna del municipio fija, el PP primero y solo las candidaturas con votos.
+- **Descargas** (botón «⬇ Descargas»): todos los datos (CSV de actas y resultados por municipio, Congreso y Senado),
+  todas las fotos en un ZIP por carpetas, o todo junto como copia de seguridad; respeta el filtro de provincia/municipio.
+  Cada foto se puede descargar también suelta desde la lista o desde la ficha del acta.
 - **Mesas pendientes**: eligiendo provincia y municipio, lista por distrito las mesas que aún no han enviado acta.
 
 Las letras de mesa (U, A, B…) y el % escrutado salen del listado oficial de **8.923 mesas** de Catalunya de las

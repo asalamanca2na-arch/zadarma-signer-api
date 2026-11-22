@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const lector = require('./lector');
+const { ZipWriter } = require('./zip');
 
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
@@ -803,6 +804,55 @@ function normalizarLectura(d) {
   };
 }
 
+// ---------- descargas ----------
+const limpiaNombre = (x) => String(x || '').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
+function nombreFoto(a) {
+  return limpiaNombre(`${a.tipo === 'senado' ? 'senado' : 'congreso'}_${a.municipio}_D${a.distrito}_S${a.seccion}_M${a.mesa}`).replace(/ /g, '-');
+}
+function filtroDe(url) {
+  const provincia = PROVINCIAS.find((x) => norm(x) === norm(url.searchParams.get('provincia'))) || '';
+  const mun = url.searchParams.get('municipio') || '';
+  return { provincia, municipio: mun && provincia ? (municipioOficial(provincia, mun) || mun) : mun };
+}
+function actasFiltradas(f, tipo) {
+  return [...actas.values()].filter((a) => (!tipo || (a.tipo === 'senado' ? 'senado' : 'congreso') === tipo) &&
+    (!f.provincia || a.provincia === f.provincia) && (!f.municipio || norm(a.municipio) === norm(f.municipio)))
+    .sort((x, y) => x.id.localeCompare(y.id));
+}
+function clavesExport(tipo) {
+  return tipo === 'senado'
+    ? PROVINCIAS.flatMap((pr) => (config.senado[pr] || []).map((c) => ({ id: c.id, titulo: `${c.nombre} (${c.partido}, ${pr})` })))
+    : config.partidos.map((x) => ({ id: x.id, titulo: x.nombre }));
+}
+function csvActas(tipo, f) {
+  const claves = clavesExport(tipo);
+  const cols = ['provincia', 'municipio', 'colegio', 'distrito', 'seccion', 'mesa', 'censo', 'votantes', tipo === 'senado' ? 'papeletas_nulas' : 'nulos', tipo === 'senado' ? 'papeletas_blanco' : 'blancos',
+    ...claves.map((c) => c.titulo), 'correcta', 'verificada', 'avisos', 'observaciones', 'enviado_por', 'confirmada_por', 'recibido', 'foto'];
+  const lines = [cols.map(csvCell).join(';')];
+  for (const a of actasFiltradas(f, tipo)) {
+    lines.push([a.provincia, a.municipio, a.colegio, a.distrito, a.seccion, a.mesa, a.censo, a.votantes, a.nulos, a.blancos,
+      ...claves.map((c) => a.votos[c.id] ?? ''), a.cuadra ? 'SI' : 'NO', a.revisada ? 'SI' : 'NO', (a.avisos || []).join(' | '), a.observaciones,
+      a.enviadoPor?.nombre, (a.confirmaciones || []).map((c) => c.nombre).join(', '), new Date(a.recibido).toLocaleString('es-ES'), a.foto ? nombreFoto(a) + path.extname(a.foto) : ''].map(csvCell).join(';'));
+  }
+  return '\uFEFF' + lines.join('\r\n');
+}
+function csvMunicipios(tipo, f) {
+  const claves = tipo === 'senado' ? clavesExport('senado') : config.partidos.map((x) => ({ id: x.id, titulo: x.nombre }));
+  const g = {};
+  for (const a of actasFiltradas(f, tipo)) {
+    const m = g[a.provincia + '|' + a.municipio] ||= { provincia: a.provincia, municipio: a.municipio, actas: 0, censo: 0, votantes: 0, nulos: 0, blancos: 0, votos: {} };
+    m.actas++; m.censo += a.censo; m.votantes += a.votantes; m.nulos += a.nulos; m.blancos += a.blancos;
+    for (const c of claves) m.votos[c.id] = (m.votos[c.id] || 0) + (a.votos[c.id] || 0);
+  }
+  const cols = ['provincia', 'municipio', 'actas_recibidas', 'mesas_totales', 'censo', 'votantes', 'participacion_%', 'nulos', 'blancos', ...claves.map((c) => c.titulo)];
+  const lines = [cols.map(csvCell).join(';')];
+  for (const m of Object.values(g).sort((x, y) => x.provincia.localeCompare(y.provincia) || x.municipio.localeCompare(y.municipio, 'ca'))) {
+    lines.push([m.provincia, m.municipio, m.actas, contarMesas(m.provincia, m.municipio), m.censo, m.votantes, m.censo ? (m.votantes / m.censo * 100).toFixed(2).replace('.', ',') : '', m.nulos, m.blancos,
+      ...claves.map((c) => m.votos[c.id] || 0)].map(csvCell).join(';'));
+  }
+  return '\uFEFF' + lines.join('\r\n');
+}
+
 function aPapelera(lista) {
   const dir = path.join(DATA_DIR, 'papelera', new Date().toISOString().replace(/[:.]/g, '-'));
   fs.mkdirSync(dir, { recursive: true });
@@ -1019,23 +1069,46 @@ async function handle(req, res) {
       const f = path.basename(url.searchParams.get('f') || '');
       const file = path.join(FOTOS_DIR, f);
       if (!f || !fs.existsSync(file)) return send(res, 404, 'No encontrada');
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'image/jpeg', 'Cache-Control': 'private, max-age=3600' });
+      const h = { 'Content-Type': MIME[path.extname(f)] || 'image/jpeg', 'Cache-Control': 'private, max-age=3600' };
+      if (url.searchParams.get('descargar')) {
+        const a = [...actas.values()].find((x) => x.foto === f || (x.historial || []).some((v) => v.foto === f));
+        const nombre = (a ? nombreFoto(a) : 'acta') + path.extname(f);
+        const rfc5987 = encodeURIComponent(nombre).replace(/['()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+        h['Content-Disposition'] = `attachment; filename="${nombre.replace(/[^\x20-\x7e]|["']/g, '_')}"; filename*=UTF-8''${rfc5987}`;
+      }
+      res.writeHead(200, h);
       return fs.createReadStream(file).pipe(res);
     }
     if (p === '/api/admin/export.csv' && m === 'GET') {
       const senado = url.searchParams.get('tipo') === 'senado';
-      const claves = senado
-        ? PROVINCIAS.flatMap((pr) => (config.senado[pr] || []).map((c) => ({ id: c.id, titulo: `${c.nombre} (${c.partido}, ${pr})` })))
-        : config.partidos.map((x) => ({ id: x.id, titulo: x.nombre }));
-      const cols = ['provincia', 'municipio', 'colegio', 'distrito', 'seccion', 'mesa', 'censo', 'votantes', 'nulos', 'blancos', ...claves.map((c) => c.titulo), 'correcta', 'avisos', 'observaciones', 'enviado_por', 'dispositivo', 'recibido'];
-      const lines = [cols.map(csvCell).join(';')];
-      for (const a of [...actas.values()].filter((x) => (x.tipo === 'senado') === senado).sort((x, y) => x.id.localeCompare(y.id))) {
-        lines.push([a.provincia, a.municipio, a.colegio, a.distrito, a.seccion, a.mesa, a.censo, a.votantes, a.nulos, a.blancos,
-          ...claves.map((c) => a.votos[c.id] ?? ''), a.cuadra ? 'SI' : 'NO', a.avisos.join(' | '), a.observaciones,
-          a.enviadoPor?.nombre, a.enviadoPor?.dispositivo?.slice(0, 8), a.recibido].map(csvCell).join(';'));
-      }
       const nombre = senado ? 'actas-senado.csv' : 'actas-congreso.csv';
-      return send(res, 200, '\uFEFF' + lines.join('\r\n'), { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${nombre}"` });
+      return send(res, 200, csvActas(senado ? 'senado' : 'congreso', filtroDe(url)), { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${nombre}"` });
+    }
+    // Descarga en ZIP: ?fotos=1 (fotos) ?datos=1 (CSV de datos y resultados) — se pueden combinar. Respeta ?provincia y ?municipio.
+    if (p === '/api/admin/descarga.zip' && m === 'GET') {
+      const filtro = filtroDe(url);
+      const conFotos = url.searchParams.get('fotos') === '1', conDatos = url.searchParams.get('datos') === '1';
+      const sufijo = [filtro.provincia, filtro.municipio].filter(Boolean).join('-').replace(/[^A-Za-z0-9-]+/g, '_');
+      const nombre = `actas${conDatos && !conFotos ? '-datos' : ''}${conFotos && !conDatos ? '-fotos' : ''}${sufijo ? '-' + sufijo : ''}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.zip`;
+      res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${nombre}"`, 'Cache-Control': 'no-store' });
+      const zip = new ZipWriter(res);
+      if (conDatos) {
+        for (const t of ['congreso', 'senado']) {
+          await zip.add(`actas-${t}.csv`, Buffer.from(csvActas(t, filtro), 'utf8'));
+          await zip.add(`resultados-por-municipio-${t}.csv`, Buffer.from(csvMunicipios(t, filtro), 'utf8'));
+        }
+        await zip.add('LEEME.txt', Buffer.from(`Descarga del ${new Date().toLocaleString('es-ES')}\r\n\r\nactas-*.csv: una fila por acta (mesa), con todos los votos.\r\nresultados-por-municipio-*.csv: totales por municipio.\r\nfotos/: foto de cada acta, por tipo, provincia y municipio.\r\nLos CSV se abren con Excel (separador punto y coma).\r\n`, 'utf8'));
+      }
+      if (conFotos) {
+        for (const a of actasFiltradas(filtro).filter((x) => x.foto)) {
+          const file = path.join(FOTOS_DIR, a.foto);
+          if (!fs.existsSync(file)) continue;
+          const carpeta = [a.tipo === 'senado' ? 'senado' : 'congreso', a.provincia, a.municipio].map(limpiaNombre).join('/');
+          await zip.add(`fotos/${carpeta}/${nombreFoto(a)}${path.extname(a.foto)}`, await fs.promises.readFile(file), new Date(a.recibido));
+        }
+      }
+      await zip.end();
+      return;
     }
     if (p === '/api/admin/config' && m === 'GET') {
       return send(res, 200, { config, mesas: mesas.length });
