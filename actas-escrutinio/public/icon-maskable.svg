@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <clipPath id="izq"><rect x="0" y="0" width="256" height="512"/></clipPath>
+    <clipPath id="der"><rect x="256" y="0" width="256" height="512"/></clipPath>
+    <clipPath id="ranura"><rect x="0" y="0" width="512" height="279"/></clipPath>
+  </defs>
+  <!-- Mitad izquierda: bandera de España (rojo-amarillo-rojo, 1:2:1) -->
+  <g clip-path="url(#izq)">
+    <rect width="512" height="512" fill="#c60b1e"/>
+    <rect y="128" width="512" height="256" fill="#ffc400"/>
+  </g>
+  <!-- Mitad derecha: senyera (9 franjas: 4 rojas sobre amarillo) -->
+  <g clip-path="url(#der)">
+    <rect width="512" height="512" fill="#fcdd09"/>
+    <rect y="56.9" width="512" height="56.9" fill="#da121a"/>
+    <rect y="170.7" width="512" height="56.9" fill="#da121a"/>
+    <rect y="284.4" width="512" height="56.9" fill="#da121a"/>
+    <rect y="398.2" width="512" height="56.9" fill="#da121a"/>
+  </g>
+
+  <g transform="translate(51.2 51.2) scale(0.8)">
+  <!-- Sombra suave detrás de la urna -->
+  <ellipse cx="256" cy="452" rx="150" ry="18" fill="#000" opacity=".25"/>
+
+  <!-- Urna -->
+  <path d="M146 262 H366 L386 300 H126 Z" fill="#e9eef5" stroke="#1d2a3a" stroke-width="8" stroke-linejoin="round"/>
+  <rect x="126" y="298" width="260" height="150" rx="16" fill="#ffffff" stroke="#1d2a3a" stroke-width="8"/>
+  <rect x="200" y="272" width="112" height="14" rx="7" fill="#1d2a3a"/>
+  <!-- Etiqueta de la urna -->
+  <rect x="186" y="338" width="140" height="66" rx="10" fill="#1565d8"/>
+  <path d="M222 371 l20 20 l48 -44" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Papeleta entrando por la ranura -->
+  <g clip-path="url(#ranura)"><g transform="translate(0 44) rotate(-6 256 200)">
+    <rect x="214" y="118" width="92" height="132" rx="6" fill="#ffffff" stroke="#1d2a3a" stroke-width="7"/>
+    <path d="M232 160 l14 14 l28 -30" fill="none" stroke="#1565d8" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="232" y="192" width="56" height="7" rx="3.5" fill="#9aa5b1"/>
+    <rect x="232" y="208" width="42" height="7" rx="3.5" fill="#9aa5b1"/>
+  </g></g>
+
+  <!-- Mano que mete el voto (desde arriba a la derecha) -->
+  <g transform="translate(-6 46)" stroke="#7a4a2a" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+    <!-- manga -->
+    <path d="M400 40 L470 70 L430 160 L360 128 Z" fill="#1565d8"/>
+    <!-- palma -->
+    <path d="M360 128 L430 160 Q420 200 380 212 L318 198 Q296 190 300 168 Q306 146 330 136 Z" fill="#f3c6a0"/>
+    <!-- dedos sujetando la papeleta -->
+    <path d="M318 198 Q298 206 286 194 Q280 182 294 176 L322 172" fill="#f3c6a0"/>
+    <path d="M330 176 Q300 172 296 156 Q296 144 312 144 L338 150" fill="#f3c6a0"/>
+    <!-- pulgar por delante de la papeleta -->
+    <path d="M340 140 Q312 120 300 128 Q292 138 306 148 L334 160" fill="#f3c6a0"/>
+  </g>
+  </g>
+</svg>

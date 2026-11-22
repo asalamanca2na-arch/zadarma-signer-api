@@ -487,6 +487,28 @@ $('b-enviar').addEventListener('click', async () => {
   }
 });
 
+// ---------- instalar la app en el móvil ----------
+// Android/Chrome: el navegador ofrece la instalación (beforeinstallprompt). iPhone: hay que hacerlo desde Safari a mano.
+const instalada = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const esSafariIOS = esIOS && !/crios|fxios|edgios|opios/i.test(navigator.userAgent);
+const esMovil = esIOS || /android/i.test(navigator.userAgent);
+let avisoInstalar = null;
+function mostrarInstalar() { $('instalar').classList.toggle('hidden', instalada() || !(avisoInstalar || esMovil)); }
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); avisoInstalar = e; mostrarInstalar(); });
+window.addEventListener('appinstalled', () => { avisoInstalar = null; $('instalar').classList.add('hidden'); });
+$('b-instalar').addEventListener('click', async () => {
+  if (avisoInstalar) { avisoInstalar.prompt(); await avisoInstalar.userChoice.catch(() => {}); avisoInstalar = null; mostrarInstalar(); return; }
+  if (esIOS && !esSafariIOS) {
+    modal('<div class="big">🧭</div><h2 style="justify-content:center">Ábrela en Safari</h2><p>En iPhone solo se puede instalar desde <b>Safari</b>. Copia el enlace, ábrelo en Safari y pulsa otra vez «Instalar».</p><button class="btn" data-close>Entendido</button>');
+  } else if (esIOS) {
+    modal('<h2 style="justify-content:center">Instalar en el iPhone</h2><ol style="text-align:left;line-height:1.6;padding-left:22px"><li>Pulsa el botón <b>Compartir</b> <span style="font-size:1.3em">⬆️</span> (abajo en el centro, o arriba en iPad).</li><li>Baja y elige <b>«Añadir a pantalla de inicio»</b> ➕.</li><li>Pulsa <b>«Añadir»</b>. Ya tendrás el icono de la urna en tu pantalla.</li></ol><button class="btn" data-close>Entendido</button>');
+  } else {
+    modal('<h2 style="justify-content:center">Instalar en el móvil</h2><ol style="text-align:left;line-height:1.6;padding-left:22px"><li>Abre el menú del navegador <b>⋮</b> (arriba a la derecha).</li><li>Elige <b>«Instalar aplicación»</b> o <b>«Añadir a pantalla de inicio»</b>.</li><li>Confirma. Ya tendrás el icono de la urna en tu pantalla.</li></ol><button class="btn" data-close>Entendido</button>');
+  }
+});
+mostrarInstalar();
+
 // ---------- arranque ----------
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 (async () => {

@@ -6,8 +6,13 @@
   <meta name="theme-color" content="#1565d8">
   <title>Recuento de actas</title>
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/icon.svg">
-  <link rel="apple-touch-icon" href="/icon.svg">
+  <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Actas">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -18,7 +23,13 @@
     <div class="topbar">
       <div class="title"><span id="h-eleccion" class="badge">Elecciones</span></div>
     </div>
-    <h1>Recuento de actas</h1>
+    <h1 class="row" style="gap:10px"><img src="/icon-192.png" alt="" width="40" height="40" style="border-radius:10px">Recuento de actas</h1>
+
+    <div id="instalar" class="card row hidden" style="background:#eef4ff;border:1px solid #c9dafc">
+      <img src="/icon-192.png" alt="" width="48" height="48" style="border-radius:12px;flex:none">
+      <div class="grow"><b>Instala la app en el móvil</b><div class="muted">Tendrás el icono en la pantalla de inicio y abrirá aunque no haya cobertura.</div></div>
+      <button class="btn small" id="b-instalar">📲 Instalar</button>
+    </div>
 
     <div id="h-pend" class="warn hidden">
       <b><span id="h-pend-n">0</span> acta(s) pendiente(s) de enviar.</b><br>
