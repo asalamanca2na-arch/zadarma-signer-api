@@ -1311,6 +1311,20 @@ async function handle(req, res) {
       reclPapelera([r]);
       return send(res, 200, { ok: true });
     }
+    // Verificar con la IA las fotos de un acta que no se verificaron (p. ej., enviadas antes de activar la verificación).
+    if (p === '/api/admin/acta/verificar' && m === 'POST') {
+      const b = await readBody(req);
+      const a = actas.get(b.id);
+      if (!a) return send(res, 404, { error: 'No existe' });
+      if (!lector.disponible()) return send(res, 503, { error: 'La lectura automática no está activada' });
+      let n = 0;
+      for (const v of [a, ...(a.historial || [])]) {
+        if (!v.foto || ['coincide', 'difiere', 'no_es_acta', 'pendiente'].includes(v.ia?.estado)) continue;
+        try { const b64 = fs.readFileSync(path.join(FOTOS_DIR, v.foto)).toString('base64'); v.ia = { estado: 'pendiente' }; encolarVerificacion(a.id, v.foto, b64, MIME[path.extname(v.foto)] || 'image/jpeg'); n++; } catch {}
+      }
+      calcula(a); writeJSON(path.join(ACTAS_DIR, fileIdFor(a.id) + '.json'), a);
+      return send(res, 200, { ok: true, verificando: n });
+    }
     if (p === '/api/admin/acta/borrar' && m === 'POST') {
       const b = await readBody(req);
       const a = actas.get(b.id);

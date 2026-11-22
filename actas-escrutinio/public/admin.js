@@ -242,16 +242,22 @@ function pintarActas(L) {
 ['f-q', 'f-inc'].forEach((id) => $(id).addEventListener('input', () => datos && pintarActas(filtradas())));
 
 // ---------- detalle de acta ----------
+// Candidaturas (Congreso) o candidatos (Senado) del acta, en el MISMO ORDEN que la papeleta/acta de su provincia.
+function ordenActa(a) {
+  if (a.tipo === 'senado') return (datos.config.senado?.[a.provincia] || []).map((c, i) => [`${i + 1}. ${c.nombre} (${c.partido})`, c.id]);
+  return datos.config.partidos.filter((p) => a.votos && p.id in a.votos)
+    .map((p, i) => ({ p, n: p.orden?.[a.provincia] ?? 1000 + i })).sort((x, y) => x.n - y.n)
+    .map(({ p, n }) => [n < 1000 ? `${n}. ${p.nombre}` : p.nombre, p.id]);
+}
 function tablaVotos(a, actual) {
   const sen = a.tipo === 'senado';
-  const lista = sen ? (datos.config.senado?.[a.provincia] || []).map((c) => [`${c.nombre} (${c.partido})`, c.id]) : datos.config.partidos.filter((p) => a.votos && p.id in a.votos).map((p) => [p.nombre, p.id]);
+  const lista = ordenActa(a);
   const filas = [['Electores (censo)', a.censo], ['Votantes', a.votantes], [sen ? 'Papeletas nulas' : 'Nulos', a.nulos], [sen ? 'Papeletas en blanco' : 'Blancos', a.blancos], ...lista.map(([k, id]) => [k, a.votos?.[id] ?? 0])];
   const ref = actual ? tablaValores(actual) : null;
   return `<table>${filas.map(([k, v], i) => `<tr${ref && ref[i] !== v ? ' class="dif"' : ''}><td>${esc(k)}</td><td class="n"><b>${fmt(v)}</b>${ref && ref[i] !== v ? ` <span class="muted">(ahora ${fmt(ref[i])})</span>` : ''}</td></tr>`).join('')}</table>`;
 }
 function tablaValores(a) {
-  const sen = a.tipo === 'senado';
-  const ids = sen ? (datos.config.senado?.[a.provincia] || []).map((c) => c.id) : datos.config.partidos.filter((p) => a.votos && p.id in a.votos).map((p) => p.id);
+  const ids = ordenActa(a).map(([, id]) => id);
   return [a.censo, a.votantes, a.nulos, a.blancos, ...ids.map((id) => a.votos?.[id] ?? 0)];
 }
 // Estado de la verificación de la foto por la IA.
@@ -285,7 +291,8 @@ async function verActa(id) {
         : '<p class="warn">Esta acta se envió <b>sin foto</b>: no se puede verificar con la imagen.</p>'}</div>
       <div>
         <div class="status ${a.cuadra ? 'ok' : 'bad'}">${estado}</div>
-        ${a.foto ? `<div class="ia-box ${a.ia?.estado || 'sin'}"><b>🤖 Verificación de la foto:</b> ${{ coincide: 'la IA ha leído la foto y <b>coincide</b> con los datos enviados.', difiere: '<b>no coincide</b> con los datos enviados:', pendiente: 'la IA la está leyendo… (unos segundos)', error: 'no se ha podido verificar.', no_es_acta: 'la foto <b>no parece un acta</b>.', ilegible: 'la IA no ha podido leer las cifras.' }[a.ia?.estado] || 'no activada (sin clave de IA).'}
+        ${a.foto ? `<div class="ia-box ${a.ia?.estado || 'sin'}"><b>🤖 Verificación de la foto:</b> ${{ coincide: 'la IA ha leído la foto y <b>coincide</b> con los datos enviados.', difiere: '<b>no coincide</b> con los datos enviados:', pendiente: 'la IA la está leyendo… (unos segundos)', error: 'no se ha podido verificar.', no_es_acta: 'la foto <b>no parece un acta</b>.', ilegible: 'la IA no ha podido leer las cifras.' }[a.ia?.estado] || (publica?.lecturaAutomatica ? 'sin verificar: esta acta se envió antes de activar la verificación.' : 'no activada (sin clave de IA).')}
+          ${publica?.lecturaAutomatica && (!a.ia || ['error', 'ilegible'].includes(a.ia.estado)) ? '<button class="btn secondary small" id="m-verificar" style="margin-top:6px">🤖 Verificar ahora</button>' : ''}
           ${a.ia?.estado === 'difiere' ? `<ul>${a.ia.diferencias.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>` : ''}</div>` : '<div class="ia-box sin"><b>📷 Sin foto:</b> no se puede verificar. Si llega otra versión con foto, tendrá prioridad.</div>'}
         ${a.prioridad && (a.historial || []).length ? `<p class="muted" style="margin:6px 0">⭐ ${esc(a.prioridad)}.</p>` : ''}
         ${(a.avisos || []).length ? `<p class="warn" style="margin-top:10px">${a.avisos.map(esc).join('<br>')}</p>` : ''}
@@ -313,6 +320,11 @@ async function verActa(id) {
     await api('/api/admin/acta/version', { method: 'POST', body: { id: a.id, indice: Number(b.dataset.usar) } });
     refrescar(); verActa(a.id);
   }));
+  if ($('m-verificar')) $('m-verificar').onclick = async () => {
+    $('m-verificar').disabled = true; $('m-verificar').textContent = '🤖 Verificando…';
+    try { await api('/api/admin/acta/verificar', { method: 'POST', body: { id: a.id } }); } catch (e) { alert(e.message); }
+    setTimeout(async () => { await refrescar(); verActa(a.id); }, 12000);
+  };
   $('m-del').onclick = async () => {
     if (!confirm('¿Borrar esta acta? Desaparecerá del recuento y de la lista del apoderado.')) return;
     await api('/api/admin/acta/borrar', { method: 'POST', body: { id: a.id } });
