@@ -104,6 +104,10 @@ async function pintarInicio() {
   $('h-lista').innerHTML = items.join('') || '<li class="muted">Todavía no has enviado ninguna.</li>';
 }
 async function inicio() { show('s-home'); await pintarInicio(); vaciarCola(); }
+// La lista se actualiza sola (por ejemplo, si el equipo borra un acta desde el panel).
+const enInicio = () => $('s-home').classList.contains('active') && !$('modal').classList.contains('open');
+setInterval(() => { if (enInicio() && document.visibilityState === 'visible') pintarInicio(); }, 30000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && enInicio()) pintarInicio(); });
 
 // ---------- foto ----------
 $('b-camara').addEventListener('click', () => $('i-camara').click());
@@ -322,7 +326,7 @@ function modoManual(on) {
 }
 $('b-manual').addEventListener('click', () => modoManual(modo !== 'manual'));
 
-$('b-ubic-ok').addEventListener('click', () => {
+$('b-ubic-ok').addEventListener('click', async () => {
   const err = (t) => { $('u-err').textContent = t; $('u-err').classList.remove('hidden'); };
   if (!borrador.tipo) return err('Elige arriba si el acta es del Congreso o del Senado.');
   const nombre = $('u-nombre').value.trim(), colegio = $('u-colegio').value.trim();
@@ -344,8 +348,24 @@ $('b-ubic-ok').addEventListener('click', () => {
   u.colegio = colegio;
   borrador.ubicacion = u; borrador.nombre = nombre;
   store.set('ultima-mesa', u);
+  // ¿Otra persona ya ha enviado el acta de esta mesa? Se avisa para no duplicarla.
+  if (navigator.onLine !== false) {
+    let ex = null;
+    try { ex = await api(`/api/existe?${new URLSearchParams({ tipo: borrador.tipo, provincia: u.provincia, municipio: u.municipio, distrito: u.distrito, seccion: u.seccion, mesa: u.mesa })}`); } catch {}
+    if (ex?.existe) { avisoYaEnviada(ex, u); return; }
+  }
   irVotos();
 });
+function avisoYaEnviada(ex, u) {
+  const hora = new Date(ex.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  const quien = ex.mia ? 'tú mismo/a' : `<b>${esc(ex.nombre || 'otro apoderado')}</b>`;
+  modal(`<div class="big">📋</div><h2 style="justify-content:center">Esta acta ya está enviada</h2>
+    <p>El acta del <b>${nombreTipo(borrador.tipo)}</b> de la mesa <b>${esc(u.municipio)} · Dist. ${Number(u.distrito)} · Secc. ${Number(u.seccion)} · Mesa ${esc(u.mesa)}</b> ya la envió ${quien} a las ${hora}.</p>
+    <p class="muted">No hace falta enviarla otra vez. Si comparando con el acta ves que algún número está mal, puedes enviar la corrección: quedará marcada para que la revise el equipo.</p>
+    <button class="btn" id="b-ya-ok">De acuerdo, no la envío</button><button class="btn secondary" id="b-ya-corregir">Enviar una corrección</button>`, { cerrar: false });
+  $('b-ya-ok').onclick = () => { cerrarModal(); borrador = null; inicio(); };
+  $('b-ya-corregir').onclick = () => { cerrarModal(); irVotos(); };
+}
 
 // ---------- paso 2: votos ----------
 // Candidaturas que se presentan en esa provincia (sin "orden" = en todas)
@@ -468,10 +488,11 @@ $('b-enviar').addEventListener('click', async () => {
   const envio = { tipo: borrador.tipo, nombre: borrador.nombre, clientId: borrador.clientId, ubicacion: borrador.ubicacion, votos: v, observaciones: $('v-obs').value, foto: borrador.foto || null, creado: new Date().toISOString() };
   modal('<div class="spinner"></div><p>Enviando acta…</p>', { cerrar: false });
   try {
-    await api('/api/actas', { method: 'POST', body: envio });
+    const r = await api('/api/actas', { method: 'POST', body: envio });
     borrador.enviado = true;
     const u = envio.ubicacion;
-    modal(`<div class="big">✅</div><h2 style="justify-content:center">Acta del ${nombreTipo(envio.tipo)} enviada</h2><p>${esc(u.municipio)} · Distrito ${esc(u.distrito)} · Sección ${esc(u.seccion)} · Mesa ${esc(u.mesa)}</p><button class="btn" data-close>OK</button>`);
+    if (r.duplicada) modal(`<div class="big">👍</div><h2 style="justify-content:center">Ya estaba enviada</h2><p>Esta acta ya la había enviado otra persona con <b>los mismos números</b>. No se ha duplicado: cuenta una sola vez.</p><button class="btn" data-close>OK</button>`);
+    else modal(`<div class="big">✅</div><h2 style="justify-content:center">Acta del ${nombreTipo(envio.tipo)} enviada</h2><p>${esc(u.municipio)} · Distrito ${esc(u.distrito)} · Sección ${esc(u.seccion)} · Mesa ${esc(u.mesa)}</p><button class="btn" data-close>OK</button>`);
     borrador = null;
     inicio();
   } catch (e) {

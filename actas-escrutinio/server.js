@@ -637,7 +637,7 @@ function clientIp(req) {
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json',
+  '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.webmanifest': 'application/manifest+json',
 };
 function serveStatic(req, res, pathname) {
   if (pathname === '/') pathname = '/index.html';
@@ -693,6 +693,11 @@ function resumenActa(a) {
   return { ...rest, versiones: (historial || []).length + 1 };
 }
 
+function mismosDatos(a, d) {
+  return ['censo', 'votantes', 'nulos', 'blancos'].every((k) => a[k] === d[k]) &&
+    Object.keys({ ...a.votos, ...d.votos }).every((k) => (a.votos?.[k] ?? 0) === (d.votos?.[k] ?? 0));
+}
+
 function guardarActa(body, user) {
   const u = body.ubicacion || {};
   const provincia = PROVINCIAS.find((p) => norm(p) === norm(u.provincia));
@@ -732,6 +737,17 @@ function guardarActa(body, user) {
 
   const previa = actas.get(id);
   if (previa && body.clientId && previa.clientId === body.clientId) return previa; // reenvío idempotente
+  // Otra persona sube la misma acta con los mismos números: no se duplica ni se crea otra versión.
+  if (previa && mismosDatos(previa, datos)) {
+    const yaTeniaFoto = !!previa.foto;
+    if (!yaTeniaFoto && typeof body.foto === 'string' && body.foto.startsWith('data:image/')) {
+      const m = body.foto.match(/^data:image\/(jpeg|png|webp);base64,(.+)$/);
+      if (m) { previa.foto = `${fileIdFor(id)}-${Date.now()}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`; fs.writeFileSync(path.join(FOTOS_DIR, previa.foto), Buffer.from(m[2], 'base64')); }
+    }
+    (previa.confirmaciones ||= []).push({ nombre: user.nombre, dispositivo: user.dispositivo, recibido: new Date().toISOString() });
+    writeJSON(path.join(ACTAS_DIR, fileIdFor(id) + '.json'), previa);
+    return Object.assign(Object.create(null), previa, { duplicada: true });
+  }
 
   let foto = null;
   if (typeof body.foto === 'string' && body.foto.startsWith('data:image/')) {
@@ -756,9 +772,7 @@ function guardarActa(body, user) {
   if (previa) {
     const { historial, ...anterior } = previa;
     acta.historial = [...(historial || []), anterior];
-    const mismos = ['censo', 'votantes', 'nulos', 'blancos'].every((k) => anterior[k] === acta[k]) &&
-      Object.keys({ ...anterior.votos, ...acta.votos }).every((k) => (anterior.votos?.[k] ?? 0) === (acta.votos[k] ?? 0));
-    acta.conflicto = previa.conflicto || !mismos;
+    acta.conflicto = true; // llega aquí solo si los números son distintos a los ya enviados
   }
   calcula(acta);
   writeJSON(path.join(ACTAS_DIR, fileIdFor(id) + '.json'), acta);
@@ -934,12 +948,22 @@ async function handle(req, res) {
     if (rateLimitedEnvios(clientIp(req))) return send(res, 429, { error: 'Demasiados envíos seguidos. Espera unos minutos.' });
     const b = await readBody(req);
     const a = guardarActa(b, { nombre: String(b.nombre || '').trim().slice(0, 80), dispositivo });
-    return send(res, 200, { ok: true, acta: resumenActa(a) });
+    return send(res, 200, { ok: true, duplicada: !!a.duplicada, acta: resumenActa(a) });
+  }
+  if (p === '/api/existe' && m === 'GET') {
+    const q = Object.fromEntries(url.searchParams);
+    const provincia = PROVINCIAS.find((x) => norm(x) === norm(q.provincia));
+    if (!provincia) return send(res, 200, { existe: false });
+    const ubic = { provincia, municipio: municipioOficial(provincia, q.municipio) || q.municipio, distrito: padNum(q.distrito, 2), seccion: padNum(q.seccion, 3), mesa: String(q.mesa || '').toUpperCase() };
+    const a = actas.get((q.tipo === 'senado' ? 'senado|' : '') + mesaKey(ubic));
+    if (!a) return send(res, 200, { existe: false });
+    return send(res, 200, { existe: true, nombre: a.enviadoPor?.nombre || '', recibido: a.recibido, colegio: a.colegio, mia: !!dispositivo && a.enviadoPor?.dispositivo === dispositivo });
   }
   if (p === '/api/mis-actas' && m === 'GET') {
     if (!dispositivo) return send(res, 200, []);
     return send(res, 200, [...actas.values()].filter((a) => a.enviadoPor?.dispositivo === dispositivo ||
-      (a.historial || []).some((h) => h.enviadoPor?.dispositivo === dispositivo)).map(resumenActa));
+      (a.historial || []).some((h) => h.enviadoPor?.dispositivo === dispositivo) ||
+      (a.confirmaciones || []).some((c) => c.dispositivo === dispositivo)).map(resumenActa));
   }
 
   // --- administración ---
@@ -963,6 +987,20 @@ async function handle(req, res) {
       return send(res, 200, { ok: true });
     }
     // Borrar = mover a data/papelera/<fecha>/ (se puede recuperar a mano si hace falta).
+    // Elegir una versión anterior como la buena (la actual pasa al historial).
+    if (p === '/api/admin/acta/version' && m === 'POST') {
+      const b = await readBody(req);
+      const a = actas.get(b.id);
+      const i = Number(b.indice);
+      if (!a || !a.historial?.[i]) return send(res, 404, { error: 'No existe esa versión' });
+      const { historial, ...actual } = a;
+      const elegida = historial[i];
+      const nueva = { ...elegida, id: a.id, tipo: a.tipo, historial: [...historial.filter((_, j) => j !== i), actual], conflicto: true, revisada: true, confirmaciones: a.confirmaciones };
+      calcula(nueva);
+      writeJSON(path.join(ACTAS_DIR, fileIdFor(a.id) + '.json'), nueva);
+      actas.set(a.id, nueva);
+      return send(res, 200, { ok: true });
+    }
     if (p === '/api/admin/acta/borrar' && m === 'POST') {
       const b = await readBody(req);
       const a = actas.get(b.id);

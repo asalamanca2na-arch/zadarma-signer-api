@@ -32,7 +32,7 @@
     td.n, th.n { text-align: right; }
     tbody tr { cursor: pointer; }
     tbody tr:hover { background: #f6f9fe; }
-    .detail { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; text-align: left; }
+    .detail { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; text-align: left; }
     .detail img { width: 100%; border-radius: 10px; background: #222; }
     .modal .box.wide { max-width: 1100px; max-height: 92vh; overflow: auto; text-align: left; }
     @media (max-width: 760px) { .detail { grid-template-columns: 1fr; } .bar { grid-template-columns: 90px 1fr 100px; } }
@@ -49,6 +49,11 @@
     .esc b { background: var(--c); color: #fff; min-width: 28px; height: 28px; border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; }
     .gd { margin: 10px 0; } .gd > div { margin-top: 4px; }
     .mp { display: inline-block; margin: 2px; padding: 2px 8px; border-radius: 6px; background: var(--bad-bg); color: var(--bad); font-size: .85rem; font-variant-numeric: tabular-nums; }
+    img.mini { width: 46px; height: 58px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); display: block; background: #eee; }
+    .visor { overflow: hidden; border-radius: 10px; background: #222; height: min(70vh, 720px); display: flex; align-items: center; justify-content: center; cursor: grab; touch-action: none; }
+    .visor img { width: auto; max-width: 100%; max-height: 100%; transform-origin: center; transition: transform .08s; user-select: none; -webkit-user-drag: none; border-radius: 0; }
+    .version { background: #f6f8fb; margin: 10px 0; }
+    tr.dif td { background: #fff3cd; }
     code { background: #eef1f5; padding: 1px 5px; border-radius: 4px; }
   </style>
 </head>

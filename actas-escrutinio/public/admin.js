@@ -230,47 +230,74 @@ function pintarActas(L) {
   const soloInc = $('f-inc').checked;
   const filas = L.filter((a) => (!soloInc || (a.incidencia && !a.revisada)) &&
     (!q || norm([a.municipio, a.colegio, a.distrito, a.seccion, a.mesa, a.enviadoPor?.nombre].join(' ')).includes(q)));
-  $('t-act').innerHTML = `<thead><tr><th>Estado</th><th>Municipio</th><th>Colegio</th><th>Dist.</th><th>Secc.</th><th>Mesa</th><th class="n">Votantes</th><th>Avisos</th><th>Apoderado</th><th>Hora</th></tr></thead><tbody>` +
-    filas.map((a) => `<tr data-id="${esc(a.id)}"><td>${a.revisada ? '<span class="pill ok">Revisada</span>' : a.incidencia ? '<span class="pill bad">Incidencia</span>' : '<span class="pill ok">OK</span>'}</td>
+  $('t-act').innerHTML = `<thead><tr><th>Foto</th><th>Estado</th><th>Municipio</th><th>Colegio</th><th>Dist.</th><th>Secc.</th><th>Mesa</th><th class="n">Votantes</th><th>Avisos</th><th>Apoderado</th><th>Hora</th></tr></thead><tbody>` +
+    filas.map((a) => `<tr data-id="${esc(a.id)}"><td>${a.foto ? `<img class="mini" loading="lazy" src="${fotoUrl(a.foto)}" alt="Foto">` : '<span class="pill wait">Sin foto</span>'}</td><td>${a.revisada ? '<span class="pill ok">Verificada</span>' : a.incidencia ? '<span class="pill bad">Incidencia</span>' : '<span class="pill ok">OK</span>'}</td>
       <td>${esc(a.municipio)}</td><td style="white-space:normal;min-width:140px">${esc(a.colegio)}</td><td>${esc(a.distrito)}</td><td>${esc(a.seccion)}</td><td>${esc(a.mesa)}</td><td class="n">${fmt(a.votantes)}</td>
-      <td style="white-space:normal;min-width:180px">${esc((a.avisos || []).join(' · '))}${a.foto ? '' : ' <span class="pill wait">Sin foto</span>'}</td>
+      <td style="white-space:normal;min-width:180px">${esc((a.avisos || []).join(' · '))}${a.confirmaciones?.length ? ` <span class="pill ok">Confirmada ${a.confirmaciones.length + 1}×</span>` : ''}</td>
       <td>${esc(a.enviadoPor?.nombre || 'Sin nombre')}</td>
       <td>${new Date(a.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</td></tr>`).join('') +
-    (filas.length ? '' : '<tr><td colspan="10" class="muted">No hay actas.</td></tr>') + '</tbody>';
+    (filas.length ? '' : '<tr><td colspan="11" class="muted">No hay actas.</td></tr>') + '</tbody>';
   $('t-act').querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => verActa(tr.dataset.id)));
 }
 ['f-prov', 'f-mun'].forEach((id) => $(id).addEventListener('input', () => datos && pintar()));
 ['f-q', 'f-inc'].forEach((id) => $(id).addEventListener('input', () => datos && pintarActas(filtradas())));
 
 // ---------- detalle de acta ----------
-function tablaVotos(a) {
+function tablaVotos(a, actual) {
   const sen = a.tipo === 'senado';
   const lista = sen ? (datos.config.senado?.[a.provincia] || []).map((c) => [`${c.nombre} (${c.partido})`, c.id]) : datos.config.partidos.filter((p) => a.votos && p.id in a.votos).map((p) => [p.nombre, p.id]);
   const filas = [['Electores (censo)', a.censo], ['Votantes', a.votantes], [sen ? 'Papeletas nulas' : 'Nulos', a.nulos], [sen ? 'Papeletas en blanco' : 'Blancos', a.blancos], ...lista.map(([k, id]) => [k, a.votos?.[id] ?? 0])];
-  return `<table>${filas.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n"><b>${fmt(v)}</b></td></tr>`).join('')}</table>`;
+  const ref = actual ? tablaValores(actual) : null;
+  return `<table>${filas.map(([k, v], i) => `<tr${ref && ref[i] !== v ? ' class="dif"' : ''}><td>${esc(k)}</td><td class="n"><b>${fmt(v)}</b>${ref && ref[i] !== v ? ` <span class="muted">(ahora ${fmt(ref[i])})</span>` : ''}</td></tr>`).join('')}</table>`;
 }
+function tablaValores(a) {
+  const sen = a.tipo === 'senado';
+  const ids = sen ? (datos.config.senado?.[a.provincia] || []).map((c) => c.id) : datos.config.partidos.filter((p) => a.votos && p.id in a.votos).map((p) => p.id);
+  return [a.censo, a.votantes, a.nulos, a.blancos, ...ids.map((id) => a.votos?.[id] ?? 0)];
+}
+const fotoUrl = (f) => `/api/admin/foto?f=${encodeURIComponent(f)}&t=${encodeURIComponent(token)}`;
 async function verActa(id) {
   const a = await api('/api/admin/acta?id=' + encodeURIComponent(id));
-  const box = $('modal-box');
-  box.innerHTML = `<div class="topbar"><div class="title"><h2 style="margin:0"><span class="badge">${a.tipo === 'senado' ? 'Senado' : 'Congreso'}</span> ${esc(a.municipio)} · ${esc(a.colegio)} · Dist. ${esc(a.distrito)} · Secc. ${esc(a.seccion)} · Mesa ${esc(a.mesa)}</h2></div><button class="btn ghost small" id="m-close">✕</button></div>
+  const sen = a.tipo === 'senado';
+  const estado = a.cuadra ? (sen ? '✓ Datos coherentes' : '✓ Los votos cuadran') : '⚠ ' + (sen ? esc(a.avisos[0] || '') : a.diferencia > 0 ? `Faltan ${a.diferencia} votos` : `Sobran ${-a.diferencia} votos`);
+  const hist = (a.historial || []).map((h, i) => `<div class="card version">
+      <div class="row"><div class="grow"><b>Versión anterior</b> · ${esc(h.enviadoPor?.nombre || 'Sin nombre')} · ${new Date(h.recibido).toLocaleString('es-ES')}</div>
+      ${h.foto ? `<button class="btn ghost small" data-verfoto="${esc(h.foto)}">🖼 Ver su foto</button>` : ''}
+      <button class="btn secondary small" data-usar="${i}">Usar esta versión</button></div>
+      ${tablaVotos({ ...h, tipo: a.tipo, provincia: a.provincia }, a)}</div>`).join('');
+  const conf = (a.confirmaciones || []).map((c) => `${esc(c.nombre || 'Sin nombre')} (${new Date(c.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })})`).join(', ');
+  $('modal-box').innerHTML = `<div class="topbar"><div class="title"><h2 style="margin:0"><span class="badge">${sen ? 'Senado' : 'Congreso'}</span> ${esc(a.municipio)} · ${esc(a.colegio)} · Dist. ${esc(a.distrito)} · Secc. ${esc(a.seccion)} · Mesa ${esc(a.mesa)}</h2></div><button class="btn ghost small" id="m-close">✕</button></div>
     <div class="detail">
-      <div>${a.foto ? `<a href="/api/admin/foto?f=${encodeURIComponent(a.foto)}&t=${encodeURIComponent(token)}" target="_blank"><img src="/api/admin/foto?f=${encodeURIComponent(a.foto)}&t=${encodeURIComponent(token)}" alt="Acta"></a><p class="muted">Pulsa la foto para abrirla en grande.</p>` : '<p class="warn">Enviada sin foto.</p>'}</div>
+      <div>${a.foto ? `<div class="visor" id="visor"><img id="visor-img" src="${fotoUrl(a.foto)}" alt="Foto del acta"></div>
+        <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">
+          <button class="btn secondary small" data-zoom="1.25">🔍 +</button><button class="btn secondary small" data-zoom="0.8">🔍 −</button>
+          <button class="btn secondary small" id="v-rot">↻ Girar</button><button class="btn secondary small" id="v-reset">Ajustar</button>
+          <a class="btn ghost small" href="${fotoUrl(a.foto)}" target="_blank">Abrir en otra pestaña ↗</a></div>
+        <p class="muted" style="margin:6px 0 0">Compara cada cifra de la foto con los datos de la derecha. Con la rueda del ratón también se hace zoom y arrastrando se mueve.</p>`
+        : '<p class="warn">Esta acta se envió <b>sin foto</b>: no se puede verificar con la imagen.</p>'}</div>
       <div>
-        <div class="status ${a.cuadra ? 'ok' : 'bad'}">${a.cuadra ? (a.tipo === 'senado' ? '✓ Datos coherentes' : '✓ Los votos cuadran') : '⚠ ' + (a.tipo === 'senado' ? esc(a.avisos[0] || '') : a.diferencia > 0 ? `Faltan ${a.diferencia} votos` : `Sobran ${-a.diferencia} votos`)}</div>
+        <div class="status ${a.cuadra ? 'ok' : 'bad'}">${estado}</div>
         ${(a.avisos || []).length ? `<p class="warn" style="margin-top:10px">${a.avisos.map(esc).join('<br>')}</p>` : ''}
         ${a.observaciones ? `<p><b>Observaciones:</b> ${esc(a.observaciones)}</p>` : ''}
         ${tablaVotos(a)}
-        <p class="muted">Enviada por ${esc(a.enviadoPor?.nombre || 'Sin nombre')} · ${new Date(a.recibido).toLocaleString('es-ES')}</p>
-        ${(a.historial || []).length ? `<details><summary><b>${a.historial.length} versión(es) anterior(es)</b></summary>${a.historial.map((h) => `<div class="card" style="background:#f6f8fb"><div class="muted">${esc(h.enviadoPor?.nombre)} · ${new Date(h.recibido).toLocaleString('es-ES')}</div>${tablaVotos({ ...h, tipo: a.tipo, provincia: a.provincia })}</div>`).join('')}</details>` : ''}
+        <p class="muted">Enviada por <b>${esc(a.enviadoPor?.nombre || 'Sin nombre')}</b> · ${new Date(a.recibido).toLocaleString('es-ES')}${conf ? `<br>✓ Confirmada con los mismos números por: ${conf}` : ''}</p>
+        ${hist ? `<details ${a.conflicto && !a.revisada ? 'open' : ''}><summary><b>⚠ ${a.historial.length} versión(es) anterior(es) con números distintos</b></summary>${hist}</details>` : ''}
         <div style="height:10px"></div>
-        <button class="btn danger" id="m-del" style="margin-bottom:10px">🗑 Borrar esta acta</button>
-        <button class="btn ${a.revisada ? 'secondary' : ''}" id="m-rev">${a.revisada ? 'Quitar marca de revisada' : '✓ Marcar como revisada'}</button>
+        <button class="btn ${a.revisada ? 'secondary' : ''}" id="m-rev" style="margin-bottom:10px">${a.revisada ? 'Quitar la marca de verificada' : '✓ Verificada: la foto y los datos coinciden'}</button>
+        <button class="btn danger" id="m-del">🗑 Borrar esta acta</button>
       </div>
     </div>`;
   $('modal').classList.add('open');
   $('m-close').onclick = () => $('modal').classList.remove('open');
+  if (a.foto) visor($('visor'), $('visor-img'));
+  $('modal-box').querySelectorAll('[data-verfoto]').forEach((b) => (b.onclick = () => { $('visor-img').src = fotoUrl(b.dataset.verfoto); }));
+  $('modal-box').querySelectorAll('[data-usar]').forEach((b) => (b.onclick = async () => {
+    if (!confirm('¿Usar esta versión anterior como la buena? La actual pasará al historial.')) return;
+    await api('/api/admin/acta/version', { method: 'POST', body: { id: a.id, indice: Number(b.dataset.usar) } });
+    refrescar(); verActa(a.id);
+  }));
   $('m-del').onclick = async () => {
-    if (!confirm('¿Borrar esta acta? Desaparecerá del recuento.')) return;
+    if (!confirm('¿Borrar esta acta? Desaparecerá del recuento y de la lista del apoderado.')) return;
     await api('/api/admin/acta/borrar', { method: 'POST', body: { id: a.id } });
     $('modal').classList.remove('open'); refrescar();
   };
@@ -278,6 +305,19 @@ async function verActa(id) {
     await api('/api/admin/acta/revisada', { method: 'POST', body: { id: a.id, revisada: !a.revisada } });
     $('modal').classList.remove('open'); refrescar();
   };
+}
+// Visor de la foto: zoom (botones o rueda), arrastrar para moverse y girar.
+function visor(caja, img) {
+  let z = 1, rot = 0, x = 0, y = 0, arr = null;
+  const pinta = () => { img.style.transform = `translate(${x}px, ${y}px) scale(${z}) rotate(${rot}deg)`; };
+  const zoom = (f) => { z = Math.min(6, Math.max(1, z * f)); if (z === 1) { x = 0; y = 0; } pinta(); };
+  $('modal-box').querySelectorAll('[data-zoom]').forEach((b) => (b.onclick = () => zoom(Number(b.dataset.zoom))));
+  $('v-rot').onclick = () => { rot = (rot + 90) % 360; pinta(); };
+  $('v-reset').onclick = () => { z = 1; rot = 0; x = 0; y = 0; pinta(); };
+  caja.addEventListener('wheel', (e) => { e.preventDefault(); zoom(e.deltaY < 0 ? 1.15 : 0.87); }, { passive: false });
+  caja.addEventListener('pointerdown', (e) => { arr = { sx: e.clientX - x, sy: e.clientY - y }; caja.setPointerCapture(e.pointerId); });
+  caja.addEventListener('pointermove', (e) => { if (arr && z > 1) { x = e.clientX - arr.sx; y = e.clientY - arr.sy; pinta(); } });
+  caja.addEventListener('pointerup', () => { arr = null; });
 }
 $('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') $('modal').classList.remove('open'); });
 
