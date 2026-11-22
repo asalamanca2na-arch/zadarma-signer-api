@@ -327,7 +327,9 @@ async function asegurarConfig() {
   if (!cfg) modal('<div class="big">📶</div><h2 style="justify-content:center">Sin conexión</h2><p>La primera vez hace falta cobertura para abrir la app. Inténtalo de nuevo en un momento.</p><button class="btn" data-close>Vale</button>');
   return !!cfg;
 }
+let avisoMesa = '';
 async function irUbicacion() {
+  $('u-mesa').classList.remove('revisar');
   if (!(await asegurarConfig())) return;
   const L = borrador.lectura;
   const guardada = store.get('ultima-mesa', {});
@@ -345,8 +347,14 @@ async function irUbicacion() {
   if (L && ult.municipio && ult.distrito && ult.seccion && $('u-secc').value !== ult.seccion) {
     modoManual(true); $('u-dist-m').value = ult.distrito; $('u-secc-m').value = ult.seccion; $('u-mesa-m').value = ult.mesa || ''; $('u-dist-m').blur();
   } else if (ult.mesa && [...$('u-mesa').options].some((o) => o.value === ult.mesa)) $('u-mesa').value = ult.mesa;
-  else if (ult.mesa && $('u-secc').value === ult.seccion) { mesaEscrita(true); $('u-mesa-m').value = ult.mesa; $('u-mesa-m').blur(); }
-  avisoLectura('u-ia', L, L && !L.municipio && L.municipioLeido ? `No hemos reconocido el municipio «${L.municipioLeido}»: elígelo de la lista.` : '');
+  else if (L && ult.mesa && $('u-secc').value === ult.seccion) {
+    // La foto dice una letra de mesa que no existe en esta sección: no se rellena, la elige el apoderado.
+    const hay = [...$('u-mesa').options].map((o) => o.value).filter((v) => v && !v.startsWith('__'));
+    $('u-mesa').value = ''; $('u-mesa').classList.add('revisar');
+    avisoMesa = `En la foto parece «Mesa ${ult.mesa}», pero en esta sección hay ${hay.join(', ')}. Mira el acta y elige la mesa correcta.`;
+  } else if (ult.mesa && $('u-secc').value === ult.seccion) { mesaEscrita(true); $('u-mesa-m').value = ult.mesa; $('u-mesa-m').blur(); }
+  avisoLectura('u-ia', L, [L && !L.municipio && L.municipioLeido ? `No hemos reconocido el municipio «${L.municipioLeido}»: elígelo de la lista.` : '', avisoMesa].filter(Boolean).join(' '));
+  avisoMesa = '';
   $('u-err').classList.add('hidden');
   marcarTipo();
   $('u-nombre').value = store.get('nombre', '');
@@ -419,7 +427,7 @@ function mesaEscrita(on) {
   $('u-mesa-m').classList.toggle('hidden', !manual);
   if (on) { $('u-mesa-m').value = ''; $('u-mesa-m').focus(); }
 }
-$('u-mesa').addEventListener('change', () => { if ($('u-mesa').value === '__escribir') mesaEscrita(true); });
+$('u-mesa').addEventListener('change', () => { $('u-mesa').classList.remove('revisar'); if ($('u-mesa').value === '__escribir') mesaEscrita(true); });
 $('u-mesa-m').addEventListener('input', () => { $('u-mesa-m').value = $('u-mesa-m').value.toUpperCase().replace(/[^A-Z]/g, ''); });
 $('u-prov').addEventListener('change', alCambiarProv);
 $('u-mun').addEventListener('change', alCambiarMun);

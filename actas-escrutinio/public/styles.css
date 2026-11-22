@@ -113,3 +113,5 @@ input.revisar { background: #fff6d6; border-color: #e0b400; }
 
 .recl-card { border: 1.5px dashed #e0b400; background: #fffdf3; }
 .tipo:has(.solo-recl:not(.hidden)) { grid-template-columns: 1fr 1fr 1fr; }
+
+select.revisar { background: #fff6d6; border-color: #e0b400; }
