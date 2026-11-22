@@ -47,6 +47,12 @@
       </ul>
     </div>
 
+    <div class="card recl-card">
+      <h2>📝 Reclamaciones</h2>
+      <p class="muted" style="margin-top:-6px">¿Has presentado un escrito de reclamación (voto impugnado, anomalía…)? Súbelo aquí con su foto.</p>
+      <div class="row"><button class="btn secondary" id="b-recl-foto">📷 Foto de la reclamación</button><button class="btn ghost small" id="b-recl-sinfoto">Sin foto</button></div>
+    </div>
+
     <div class="card">
       <h2>📄 Mis actas enviadas</h2>
       <ul id="h-lista" class="list"><li class="muted">Todavía no has enviado ninguna.</li></ul>
@@ -77,15 +83,16 @@
 
   <!-- PASO 1: UBICACIÓN -->
   <section id="s-ubic" class="screen">
-    <div class="topbar"><button class="btn ghost small" id="b-ubic-back">← Volver</button><div class="title">Paso 1 de 2 · Tus datos y mesa</div></div>
+    <div class="topbar"><button class="btn ghost small" id="b-ubic-back">← Volver</button><div class="title" id="u-titulo">Paso 1 de 2 · Tus datos y mesa</div></div>
     <div class="steps"><span class="on"></span><span></span></div>
     <p class="muted">Comprueba que la mesa coincide con lo que pone en el acta.</p>
     <div id="u-ia" class="ia hidden"></div>
     <div class="card">
-      <h2>📄 ¿Qué acta es?</h2>
+      <h2 id="u-tipo-tit">📄 ¿Qué acta es?</h2>
       <div class="tipo">
         <button type="button" class="tipo-btn" data-tipo="congreso"><b>Congreso</b><small>Papeleta blanca</small></button>
         <button type="button" class="tipo-btn" data-tipo="senado"><b>Senado</b><small>Papeleta sepia</small></button>
+        <button type="button" class="tipo-btn solo-recl hidden" data-tipo="ambas"><b>Las dos</b><small>o no lo sé</small></button>
       </div>
     </div>
     <div class="card">
@@ -111,6 +118,26 @@
       <div id="u-err" class="error hidden"></div>
     </form>
     <div class="footer-bar"><div class="inner"><button class="btn" id="b-ubic-ok">Siguiente →</button></div></div>
+  </section>
+
+  <!-- RECLAMACIÓN -->
+  <section id="s-recl" class="screen">
+    <div class="topbar"><button class="btn ghost small" data-back="s-ubic">← Volver</button><div class="title">Reclamación · Paso 2 de 2</div></div>
+    <div class="steps"><span class="on"></span><span class="on"></span></div>
+    <div class="card row">
+      <img id="r-thumb" class="thumb" alt="Foto de la reclamación">
+      <div class="grow"><b id="r-mun"></b><div class="muted" id="r-mesa"></div></div>
+    </div>
+    <div id="r-ia" class="ia hidden"></div>
+    <div class="card">
+      <h2>📝 ¿Qué se reclama?</h2>
+      <label for="r-texto" style="margin-top:0">Describe la anomalía (voto impugnado, incidencia…)</label>
+      <textarea id="r-texto" rows="5" placeholder="Ej.: anulación de un voto del PP por llevar propaganda electoral en el sobre."></textarea>
+      <label for="r-reclamante">Quién la presenta <span class="muted">(opcional)</span></label>
+      <input id="r-reclamante" placeholder="Nombre del interventor/apoderado">
+      <p class="muted" style="margin-bottom:0">Envía siempre la <b>foto del escrito firmado</b>: es la prueba para el Escrutinio General.</p>
+    </div>
+    <div class="footer-bar"><div class="inner"><button class="btn" id="b-recl-enviar">Enviar reclamación ✓</button></div></div>
   </section>
 
   <!-- PASO 2: VOTOS -->

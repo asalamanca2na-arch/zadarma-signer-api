@@ -37,6 +37,13 @@ El apoderado solo revisa: las casillas que no se han podido leer salen vacías y
 Sin la variable, la app funciona igual pero los datos se escriben a mano. La clave se crea en console.anthropic.com → API Keys
 y se pone en Render → Environment. Coste orientativo: unos pocos céntimos por acta leída.
 
+## Reclamaciones
+
+Los apoderados pueden subir **escritos de reclamación** (voto impugnado, anomalías…) con su foto: botón «📝 Foto de la reclamación»
+en la pantalla principal. Si fotografían una reclamación desde «Sacar foto del acta», la app la reconoce y lo propone.
+La IA rellena la mesa y el texto de la anomalía. En el panel hay una pestaña «📝 Reclamaciones» (foto, texto, nota del equipo,
+revisada/borrar) y el acta de esa mesa muestra «📝 Tiene reclamación». Se incluyen en las descargas (CSV y fotos).
+
 ## Cómo funciona (apoderado)
 
 1. Abre el enlace: **no hace falta iniciar sesión**.

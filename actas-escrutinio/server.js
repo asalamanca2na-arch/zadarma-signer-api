@@ -14,9 +14,10 @@ const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const ACTAS_DIR = path.join(DATA_DIR, 'actas');
 const FOTOS_DIR = path.join(DATA_DIR, 'fotos');
+const RECL_DIR = path.join(DATA_DIR, 'reclamaciones');
 const MAX_BODY = 12 * 1024 * 1024; // 12 MB (foto incluida)
 
-for (const d of [DATA_DIR, ACTAS_DIR, FOTOS_DIR]) fs.mkdirSync(d, { recursive: true });
+for (const d of [DATA_DIR, ACTAS_DIR, FOTOS_DIR, RECL_DIR]) fs.mkdirSync(d, { recursive: true });
 
 // ---------- utilidades de ficheros ----------
 function readJSON(file, fallback) {
@@ -481,6 +482,16 @@ function indexarMesas() { mesasIndex = new Map(mesas.map((x) => [mesaKey(x), x])
 
 indexarMesas();
 
+// ---------- reclamaciones (escritos de reclamación/impugnación) ----------
+const reclamaciones = new Map(); // id -> reclamación
+for (const f of fs.readdirSync(RECL_DIR)) {
+  if (!f.endsWith('.json')) continue;
+  const r = readJSON(path.join(RECL_DIR, f), null);
+  if (r && r.id) reclamaciones.set(r.id, r);
+}
+// Reclamaciones de la misma mesa que un acta (del mismo tipo, o sin tipo indicado).
+const reclDeActa = (a) => [...reclamaciones.values()].filter((r) => r.mesaKey === mesaKey(a) && (!r.tipo || r.tipo === 'ambas' || r.tipo === (a.tipo === 'senado' ? 'senado' : 'congreso')));
+
 // ---------- actas en memoria ----------
 const actas = new Map(); // mesaId -> acta
 for (const f of fs.readdirSync(ACTAS_DIR)) {
@@ -684,6 +695,8 @@ function calcula(a) {
   if (l23 && !m && !l23.includes(a.mesa)) avisos.push(`Mesa ${a.mesa} no existía en 2023 (había ${l23.split('').join(', ')})`);
   if (Object.keys(MUNICIPIOS).length && !municipioOficial(a.provincia, a.municipio) && !m) avisos.push('Municipio no reconocido');
   if (a.conflicto) avisos.push('Hay otra versión distinta del acta');
+  const nRecl = reclDeActa(a).length;
+  if (nRecl) avisos.push(`📝 Tiene ${nRecl} reclamación(es)`);
   if (a.observaciones) avisos.push('Tiene observaciones');
   const pend = (a.comentarios || []).filter((c) => !c.leido).length;
   if (pend) avisos.push(`${pend} comentario(s) del apoderado`);
@@ -694,6 +707,43 @@ function calcula(a) {
 function resumenActa(a) {
   const { historial, ...rest } = a;
   return { ...rest, versiones: (historial || []).length + 1 };
+}
+
+// Ubicación de una mesa tal como la guarda la app (provincia y municipio oficiales, distrito 2 cifras, sección 3).
+function ubicacionDe(u) {
+  const provincia = PROVINCIAS.find((p) => norm(p) === norm(u.provincia));
+  if (!provincia) throw Object.assign(new Error('Provincia no válida'), { status: 400 });
+  if (!String(u.municipio || '').trim() || !String(u.seccion || '').trim() || !String(u.mesa || '').trim() || !String(u.distrito || '').trim())
+    throw Object.assign(new Error('Faltan datos de la mesa'), { status: 400 });
+  return { provincia, municipio: municipioOficial(provincia, u.municipio) || String(u.municipio).trim(), distrito: padNum(u.distrito, 2), seccion: padNum(u.seccion, 3), mesa: String(u.mesa).trim().toUpperCase() };
+}
+function guardarReclamacion(body, user) {
+  const u = body.ubicacion || {};
+  const ubic = ubicacionDe(u);
+  const colegio = String(u.colegio || '').trim().slice(0, 120);
+  if (user.nombre.length < 3) throw Object.assign(new Error('Falta tu nombre'), { status: 400 });
+  if (colegio.length < 3) throw Object.assign(new Error('Falta el nombre del colegio electoral'), { status: 400 });
+  const texto = String(body.texto || '').trim().slice(0, 3000);
+  if (texto.length < 3 && !body.foto) throw Object.assign(new Error('Describe la reclamación o adjunta la foto'), { status: 400 });
+  const previa = [...reclamaciones.values()].find((r) => body.clientId && r.clientId === body.clientId);
+  if (previa) return previa; // reenvío desde la cola sin conexión
+  const id = 'rec-' + crypto.randomBytes(6).toString('hex');
+  let foto = null;
+  const m = typeof body.foto === 'string' && body.foto.match(/^data:image\/(jpeg|png|webp);base64,(.+)$/);
+  if (m) { foto = `${id}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`; fs.writeFileSync(path.join(FOTOS_DIR, foto), Buffer.from(m[2], 'base64')); }
+  const r = {
+    id, clase: 'reclamacion', tipo: ['congreso', 'senado', 'ambas'].includes(body.tipo) ? body.tipo : 'ambas',
+    ...ubic, colegio, mesaKey: mesaKey(ubic), texto, reclamante: String(body.reclamante || '').slice(0, 200),
+    foto, enviadoPor: { nombre: user.nombre, dispositivo: user.dispositivo }, recibido: new Date().toISOString(), clientId: body.clientId || null, revisada: false,
+  };
+  writeJSON(path.join(RECL_DIR, id + '.json'), r);
+  reclamaciones.set(id, r);
+  recalcularMesa(r.mesaKey);
+  return r;
+}
+// Vuelve a calcular los avisos de las actas de una mesa (por ejemplo, al llegar o borrarse una reclamación).
+function recalcularMesa(key) {
+  for (const a of actas.values()) if (mesaKey(a) === key) { calcula(a); writeJSON(path.join(ACTAS_DIR, fileIdFor(a.id) + '.json'), a); }
 }
 
 function mismosDatos(a, d) {
@@ -795,6 +845,9 @@ function normalizarLectura(d) {
   for (const v of d.votos || []) if (!validos.size || validos.has(v.id)) votos[v.id] = num(v.votos);
   return {
     esActa: d.es_acta !== false,
+    documento: ['acta', 'reclamacion', 'otro'].includes(d.documento) ? d.documento : (d.es_acta === false ? 'otro' : 'acta'),
+    reclamacionTexto: String(d.reclamacion_texto || '').slice(0, 2000),
+    reclamante: String(d.reclamante || '').slice(0, 200),
     tipo, provincia, municipio,
     municipioLeido: String(d.municipio || '').slice(0, 80),
     distrito: soloDig(d.distrito) ? padNum(soloDig(d.distrito), 2) : '',
@@ -809,7 +862,7 @@ function normalizarLectura(d) {
 // ---------- descargas ----------
 const limpiaNombre = (x) => String(x || '').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
 function nombreFoto(a) {
-  return limpiaNombre(`${a.tipo === 'senado' ? 'senado' : 'congreso'}_${a.municipio}_D${a.distrito}_S${a.seccion}_M${a.mesa}`).replace(/ /g, '-');
+  return limpiaNombre(`${a.clase === 'reclamacion' ? 'reclamacion' : a.tipo === 'senado' ? 'senado' : 'congreso'}_${a.municipio}_D${a.distrito}_S${a.seccion}_M${a.mesa}`).replace(/ /g, '-');
 }
 function filtroDe(url) {
   const provincia = PROVINCIAS.find((x) => norm(x) === norm(url.searchParams.get('provincia'))) || '';
@@ -838,6 +891,16 @@ function csvActas(tipo, f) {
   }
   return '\uFEFF' + lines.join('\r\n');
 }
+function csvReclamaciones(f) {
+  const cols = ['provincia', 'municipio', 'colegio', 'distrito', 'seccion', 'mesa', 'eleccion', 'reclamacion', 'reclamante', 'enviada_por', 'recibida', 'revisada', 'nota_equipo', 'foto'];
+  const lines = [cols.map(csvCell).join(';')];
+  for (const r of [...reclamaciones.values()].filter((x) => (!f.provincia || x.provincia === f.provincia) && (!f.municipio || norm(x.municipio) === norm(f.municipio)))
+    .sort((a, b) => a.mesaKey.localeCompare(b.mesaKey))) {
+    lines.push([r.provincia, r.municipio, r.colegio, r.distrito, r.seccion, r.mesa, r.tipo, r.texto, r.reclamante, r.enviadoPor?.nombre, new Date(r.recibido).toLocaleString('es-ES'),
+      r.revisada ? 'SI' : 'NO', r.nota || '', r.foto ? `${nombreFoto(r)}_${r.id.slice(-4)}${path.extname(r.foto)}` : ''].map(csvCell).join(';'));
+  }
+  return '\uFEFF' + lines.join('\r\n');
+}
 function csvMunicipios(tipo, f) {
   const claves = tipo === 'senado' ? clavesExport('senado') : config.partidos.map((x) => ({ id: x.id, titulo: x.nombre }));
   const g = {};
@@ -853,6 +916,18 @@ function csvMunicipios(tipo, f) {
       ...claves.map((c) => m.votos[c.id] || 0)].map(csvCell).join(';'));
   }
   return '\uFEFF' + lines.join('\r\n');
+}
+
+function reclPapelera(lista) {
+  const dir = path.join(DATA_DIR, 'papelera', new Date().toISOString().replace(/[:.]/g, '-') + '-reclamaciones');
+  fs.mkdirSync(dir, { recursive: true });
+  const keys = new Set();
+  for (const r of lista) {
+    try { fs.renameSync(path.join(RECL_DIR, r.id + '.json'), path.join(dir, r.id + '.json')); } catch {}
+    if (r.foto) try { fs.renameSync(path.join(FOTOS_DIR, r.foto), path.join(dir, r.foto)); } catch {}
+    reclamaciones.delete(r.id); keys.add(r.mesaKey);
+  }
+  for (const k of keys) recalcularMesa(k);
 }
 
 function aPapelera(lista) {
@@ -890,6 +965,8 @@ function resumen() {
     config, totales: tot,
     municipios: Object.values(porMunicipio).sort((a, b) => b.censo - a.censo),
     actas: lista.map(resumenActa).sort((a, b) => b.recibido.localeCompare(a.recibido)),
+    reclamaciones: [...reclamaciones.values()].map(({ enviadoPor, ...r }) => ({ ...r, enviadoPor: { nombre: enviadoPor?.nombre } }))
+      .sort((a, b) => b.recibido.localeCompare(a.recibido)),
     actualizado: new Date().toISOString(),
   };
 }
@@ -996,6 +1073,12 @@ async function handle(req, res) {
     console.log(`[lectura] ${Date.now() - t0} ms · tokens entrada ${uso?.input_tokens} salida ${uso?.output_tokens}`);
     return send(res, 200, { ok: true, lectura: normalizarLectura(datos) });
   }
+  if (p === '/api/reclamaciones' && m === 'POST') {
+    if (rateLimitedEnvios(clientIp(req))) return send(res, 429, { error: 'Demasiados envíos seguidos. Espera unos minutos.' });
+    const b = await readBody(req);
+    const r = guardarReclamacion(b, { nombre: String(b.nombre || '').trim().slice(0, 80), dispositivo });
+    return send(res, 200, { ok: true, id: r.id });
+  }
   if (p === '/api/actas' && m === 'POST') {
     if (rateLimitedEnvios(clientIp(req))) return send(res, 429, { error: 'Demasiados envíos seguidos. Espera unos minutos.' });
     const b = await readBody(req);
@@ -1026,12 +1109,22 @@ async function handle(req, res) {
   });
   if (p === '/api/mis-actas' && m === 'GET') {
     if (!dispositivo) return send(res, 200, []);
-    return send(res, 200, [...actas.values()].filter(deEsteMovil).map(paraApoderado));
+    const recl = [...reclamaciones.values()].filter((r) => r.enviadoPor?.dispositivo === dispositivo).map((r) => ({
+      id: r.id, clase: 'reclamacion', tipo: r.tipo, provincia: r.provincia, municipio: r.municipio, colegio: r.colegio, distrito: r.distrito, seccion: r.seccion, mesa: r.mesa,
+      texto: r.texto, recibido: r.recibido, hayFoto: !!r.foto, mia: true, enviadoPor: r.enviadoPor?.nombre || '', revisada: r.revisada,
+    }));
+    return send(res, 200, [...[...actas.values()].filter(deEsteMovil).map(paraApoderado), ...recl]);
   }
   // Foto de un acta propia (el apoderado solo ve las de sus actas). El identificador del móvil va en la URL para poder usarla en <img>.
   if (p === '/api/mis-actas/foto' && m === 'GET') {
-    const a = actas.get(url.searchParams.get('id') || '');
     const d = String(url.searchParams.get('d') || '').replace(/[^a-zA-Z0-9-]/g, '');
+    const rec = reclamaciones.get(url.searchParams.get('id') || '');
+    if (rec) {
+      if (!d || rec.enviadoPor?.dispositivo !== d || !rec.foto || !fs.existsSync(path.join(FOTOS_DIR, rec.foto))) return send(res, 404, 'No encontrada');
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(rec.foto)] || 'image/jpeg', 'Cache-Control': 'private, max-age=600' });
+      return fs.createReadStream(path.join(FOTOS_DIR, rec.foto)).pipe(res);
+    }
+    const a = actas.get(url.searchParams.get('id') || '');
     const suya = a && d && (a.enviadoPor?.dispositivo === d || (a.historial || []).some((h) => h.enviadoPor?.dispositivo === d) || (a.confirmaciones || []).some((c) => c.dispositivo === d));
     if (!suya || !a.foto || !fs.existsSync(path.join(FOTOS_DIR, a.foto))) return send(res, 404, 'No encontrada');
     res.writeHead(200, { 'Content-Type': MIME[path.extname(a.foto)] || 'image/jpeg', 'Cache-Control': 'private, max-age=600' });
@@ -1087,6 +1180,21 @@ async function handle(req, res) {
       actas.set(a.id, nueva);
       return send(res, 200, { ok: true });
     }
+    if (p === '/api/admin/reclamacion/revisada' && m === 'POST') {
+      const b = await readBody(req);
+      const r = reclamaciones.get(b.id);
+      if (!r) return send(res, 404, { error: 'No existe' });
+      r.revisada = !!b.revisada; r.nota = String(b.nota ?? r.nota ?? '').slice(0, 1000);
+      writeJSON(path.join(RECL_DIR, r.id + '.json'), r);
+      return send(res, 200, { ok: true });
+    }
+    if (p === '/api/admin/reclamacion/borrar' && m === 'POST') {
+      const b = await readBody(req);
+      const r = reclamaciones.get(b.id);
+      if (!r) return send(res, 404, { error: 'No existe' });
+      reclPapelera([r]);
+      return send(res, 200, { ok: true });
+    }
     if (p === '/api/admin/acta/borrar' && m === 'POST') {
       const b = await readBody(req);
       const a = actas.get(b.id);
@@ -1097,9 +1205,10 @@ async function handle(req, res) {
     if (p === '/api/admin/borrar-todas' && m === 'POST') {
       const b = await readBody(req);
       if (b.confirmacion !== 'BORRAR') return send(res, 400, { error: 'Escribe BORRAR para confirmar' });
-      const n = actas.size;
+      const n = actas.size, nr = reclamaciones.size;
       aPapelera([...actas.values()]);
-      return send(res, 200, { ok: true, borradas: n });
+      reclPapelera([...reclamaciones.values()]);
+      return send(res, 200, { ok: true, borradas: n, reclamaciones: nr });
     }
     if (p === '/api/admin/foto' && m === 'GET') {
       const f = path.basename(url.searchParams.get('f') || '');
@@ -1107,7 +1216,8 @@ async function handle(req, res) {
       if (!f || !fs.existsSync(file)) return send(res, 404, 'No encontrada');
       const h = { 'Content-Type': MIME[path.extname(f)] || 'image/jpeg', 'Cache-Control': 'private, max-age=3600' };
       if (url.searchParams.get('descargar')) {
-        const a = [...actas.values()].find((x) => x.foto === f || (x.historial || []).some((v) => v.foto === f));
+        const a = [...actas.values()].find((x) => x.foto === f || (x.historial || []).some((v) => v.foto === f)) ||
+          [...reclamaciones.values()].find((x) => x.foto === f);
         const nombre = (a ? nombreFoto(a) : 'acta') + path.extname(f);
         const rfc5987 = encodeURIComponent(nombre).replace(/['()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
         h['Content-Disposition'] = `attachment; filename="${nombre.replace(/[^\x20-\x7e]|["']/g, '_')}"; filename*=UTF-8''${rfc5987}`;
@@ -1133,6 +1243,7 @@ async function handle(req, res) {
           await zip.add(`actas-${t}.csv`, Buffer.from(csvActas(t, filtro), 'utf8'));
           await zip.add(`resultados-por-municipio-${t}.csv`, Buffer.from(csvMunicipios(t, filtro), 'utf8'));
         }
+        await zip.add('reclamaciones.csv', Buffer.from(csvReclamaciones(filtro), 'utf8'));
         await zip.add('LEEME.txt', Buffer.from(`Descarga del ${new Date().toLocaleString('es-ES')}\r\n\r\nactas-*.csv: una fila por acta (mesa), con todos los votos.\r\nresultados-por-municipio-*.csv: totales por municipio.\r\nfotos/: foto de cada acta, por tipo, provincia y municipio.\r\nLos CSV se abren con Excel (separador punto y coma).\r\n`, 'utf8'));
       }
       if (conFotos) {
@@ -1141,6 +1252,11 @@ async function handle(req, res) {
           if (!fs.existsSync(file)) continue;
           const carpeta = [a.tipo === 'senado' ? 'senado' : 'congreso', a.provincia, a.municipio].map(limpiaNombre).join('/');
           await zip.add(`fotos/${carpeta}/${nombreFoto(a)}${path.extname(a.foto)}`, await fs.promises.readFile(file), new Date(a.recibido));
+        }
+        for (const r of [...reclamaciones.values()].filter((x) => x.foto && (!filtro.provincia || x.provincia === filtro.provincia) && (!filtro.municipio || norm(x.municipio) === norm(filtro.municipio)))) {
+          const file = path.join(FOTOS_DIR, r.foto);
+          if (!fs.existsSync(file)) continue;
+          await zip.add(`fotos/reclamaciones/${limpiaNombre(r.provincia)}/${limpiaNombre(r.municipio)}/${nombreFoto(r)}_${r.id.slice(-4)}${path.extname(r.foto)}`, await fs.promises.readFile(file), new Date(r.recibido));
         }
       }
       await zip.end();

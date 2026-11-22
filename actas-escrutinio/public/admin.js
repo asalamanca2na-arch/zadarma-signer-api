@@ -140,6 +140,7 @@ function pintar() {
   pintarEscanos(config);
   pintarActas(L);
   pintarPendientes(L);
+  pintarReclamaciones();
 }
 
 // ---------- proyección de escaños del Congreso (D'Hondt, mínimo 3 % de votos válidos por provincia) ----------
@@ -284,6 +285,8 @@ async function verActa(id) {
         ${(a.avisos || []).length ? `<p class="warn" style="margin-top:10px">${a.avisos.map(esc).join('<br>')}</p>` : ''}
         ${a.observaciones ? `<p><b>Observaciones:</b> ${esc(a.observaciones)}</p>` : ''}
         ${(a.comentarios || []).length ? `<div class="coms"><b>💬 Comentarios de los apoderados</b>${a.comentarios.map((c) => `<div class="com ${c.leido ? 'leido' : ''}"><div>«${esc(c.texto)}»</div><div class="muted">${esc(c.nombre || 'Sin nombre')} · ${new Date(c.fecha).toLocaleString('es-ES')}${c.leido ? ' · revisado' : ' · <b>pendiente</b>'}</div></div>`).join('')}</div>` : ''}
+        ${(() => { const rs = (datos.reclamaciones || []).filter((r) => r.provincia === a.provincia && r.municipio === a.municipio && r.distrito === a.distrito && r.seccion === a.seccion && r.mesa === a.mesa && (r.tipo === 'ambas' || r.tipo === (a.tipo === 'senado' ? 'senado' : 'congreso')));
+          return rs.length ? `<div class="coms"><b>📝 Reclamaciones de esta mesa</b>${rs.map((r) => `<div class="com ${r.revisada ? 'leido' : ''}"><div>${esc(r.texto || '(sin texto, ver foto)')}</div><div class="muted">${esc(r.enviadoPor?.nombre || '')} · ${new Date(r.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} · <a href="#" data-verrecl="${esc(r.id)}">ver reclamación</a></div></div>`).join('')}</div>` : ''; })()}
         ${tablaVotos(a)}
         <p class="muted">Enviada por <b>${esc(a.enviadoPor?.nombre || 'Sin nombre')}</b> · ${new Date(a.recibido).toLocaleString('es-ES')}${conf ? `<br>✓ Confirmada con los mismos números por: ${conf}` : ''}</p>
         ${hist ? `<details ${a.conflicto && !a.revisada ? 'open' : ''}><summary><b>⚠ ${a.historial.length} versión(es) anterior(es) con números distintos</b></summary>${hist}</details>` : ''}
@@ -295,6 +298,7 @@ async function verActa(id) {
   $('modal').classList.add('open');
   $('m-close').onclick = () => $('modal').classList.remove('open');
   if (a.foto) visor($('visor'), $('visor-img'));
+  $('modal-box').querySelectorAll('[data-verrecl]').forEach((x) => (x.onclick = (e) => { e.preventDefault(); verReclamacion(x.dataset.verrecl); }));
   $('modal-box').querySelectorAll('[data-verfoto]').forEach((b) => (b.onclick = () => {
     $('visor-img').src = fotoUrl(b.dataset.verfoto); $('v-descargar').href = fotoDescarga(b.dataset.verfoto); $('v-abrir').href = fotoUrl(b.dataset.verfoto);
   }));
@@ -328,6 +332,59 @@ function visor(caja, img) {
 }
 $('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') $('modal').classList.remove('open'); });
 
+// ---------- reclamaciones ----------
+const tipoRecl = (t) => (t === 'senado' ? 'Senado' : t === 'congreso' ? 'Congreso' : 'Ambas');
+function reclFiltradas() {
+  const prov = $('f-prov').value, mun = norm($('f-mun').value);
+  return (datos.reclamaciones || []).filter((r) => (!prov || r.provincia === prov) && (!mun || norm(r.municipio) === mun));
+}
+function pintarReclamaciones() {
+  const pend = (datos.reclamaciones || []).filter((r) => !r.revisada).length;
+  $('tab-recl').textContent = pend ? `(${pend})` : '';
+  const filas = reclFiltradas().filter((r) => !$('f-recl-pend').checked || !r.revisada);
+  $('t-rec').innerHTML = `<thead><tr><th>Foto</th><th>Estado</th><th>Elección</th><th>Municipio</th><th>Colegio</th><th>Dist.</th><th>Secc.</th><th>Mesa</th><th>Reclamación</th><th>Enviada por</th><th>Hora</th></tr></thead><tbody>` +
+    filas.map((r) => `<tr data-recl="${esc(r.id)}"><td>${r.foto ? `<div class="row" style="gap:6px"><img class="mini" loading="lazy" src="${fotoUrl(r.foto)}" alt=""><a class="dl" href="${fotoDescarga(r.foto)}" download="${esc(nombreFotoRecl(r))}" data-nofila title="Descargar">⬇</a></div>` : '<span class="pill wait">Sin foto</span>'}</td>
+      <td>${r.revisada ? '<span class="pill ok">Revisada</span>' : '<span class="pill bad">Pendiente</span>'}</td><td>${tipoRecl(r.tipo)}</td>
+      <td>${esc(r.municipio)}</td><td style="white-space:normal;min-width:120px">${esc(r.colegio)}</td><td>${esc(r.distrito)}</td><td>${esc(r.seccion)}</td><td>${esc(r.mesa)}</td>
+      <td style="white-space:normal;min-width:240px">${esc(r.texto || '—')}</td><td>${esc(r.enviadoPor?.nombre || '')}</td>
+      <td>${new Date(r.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</td></tr>`).join('') +
+    (filas.length ? '' : '<tr><td colspan="11" class="muted">No hay reclamaciones.</td></tr>') + '</tbody>';
+  $('t-rec').querySelectorAll('tr[data-recl]').forEach((tr) => tr.addEventListener('click', (e) => { if (!e.target.closest('[data-nofila]')) verReclamacion(tr.dataset.recl); }));
+}
+$('f-recl-pend').addEventListener('input', () => datos && pintarReclamaciones());
+const nombreFotoRecl = (r) => `reclamacion_${r.municipio}_D${r.distrito}_S${r.seccion}_M${r.mesa}`.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-') + (String(r.foto).match(/\.\w+$/)?.[0] || '.jpg');
+function verReclamacion(id) {
+  const r = (datos.reclamaciones || []).find((x) => x.id === id);
+  if (!r) return;
+  const acta = datos.actas.find((a) => a.provincia === r.provincia && a.municipio === r.municipio && a.distrito === r.distrito && a.seccion === r.seccion && a.mesa === r.mesa && (r.tipo === 'ambas' || tipoDe(a) === r.tipo));
+  $('modal-box').style.maxWidth = '';
+  $('modal-box').innerHTML = `<div class="topbar"><div class="title"><h2 style="margin:0"><span class="badge">📝 Reclamación · ${tipoRecl(r.tipo)}</span> ${esc(r.municipio)} · ${esc(r.colegio)} · Dist. ${esc(r.distrito)} · Secc. ${esc(r.seccion)} · Mesa ${esc(r.mesa)}</h2></div><button class="btn ghost small" id="m-close">✕</button></div>
+    <div class="detail">
+      <div>${r.foto ? `<div class="visor" id="visor"><img id="visor-img" src="${fotoUrl(r.foto)}" alt="Reclamación"></div>
+        <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">
+          <button class="btn secondary small" data-zoom="1.25">🔍 +</button><button class="btn secondary small" data-zoom="0.8">🔍 −</button>
+          <button class="btn secondary small" id="v-rot">↻ Girar</button><button class="btn secondary small" id="v-reset">Ajustar</button>
+          <a class="btn small" href="${fotoDescarga(r.foto)}" download="${esc(nombreFotoRecl(r))}">⬇ Descargar foto</a></div>` : '<p class="warn">Enviada sin foto del escrito.</p>'}</div>
+      <div>
+        <p><b>Reclamación:</b><br>${esc(r.texto || '—')}</p>
+        ${r.reclamante ? `<p><b>La presenta:</b> ${esc(r.reclamante)}</p>` : ''}
+        <p class="muted">Subida por <b>${esc(r.enviadoPor?.nombre || '')}</b> · ${new Date(r.recibido).toLocaleString('es-ES')}</p>
+        ${acta ? `<p><button class="btn secondary small" id="m-ver-acta">Ver el acta de esta mesa →</button></p>` : '<p class="muted">Todavía no hay acta de esta mesa.</p>'}
+        <label for="m-nota">Nota del equipo <span class="muted">(opcional)</span></label>
+        <textarea id="m-nota" placeholder="Ej.: comunicada al representante; incluir en el Escrutinio General">${esc(r.nota || '')}</textarea>
+        <div style="height:10px"></div>
+        <button class="btn ${r.revisada ? 'secondary' : ''}" id="m-rrev" style="margin-bottom:10px">${r.revisada ? 'Quitar la marca de revisada' : '✓ Marcar como revisada'}</button>
+        <button class="btn danger" id="m-rdel">🗑 Borrar esta reclamación</button>
+      </div>
+    </div>`;
+  $('modal').classList.add('open');
+  $('m-close').onclick = () => $('modal').classList.remove('open');
+  if (r.foto) visor($('visor'), $('visor-img'));
+  if (acta) $('m-ver-acta').onclick = () => verActa(acta.id);
+  $('m-rrev').onclick = async () => { await api('/api/admin/reclamacion/revisada', { method: 'POST', body: { id: r.id, revisada: !r.revisada, nota: $('m-nota').value } }); $('modal').classList.remove('open'); refrescar(); };
+  $('m-rdel').onclick = async () => { if (!confirm('¿Borrar esta reclamación?')) return; await api('/api/admin/reclamacion/borrar', { method: 'POST', body: { id: r.id } }); $('modal').classList.remove('open'); refrescar(); };
+}
+
 // ---------- descargas ----------
 $('b-descargas').addEventListener('click', () => {
   const prov = $('f-prov').value, mun = $('f-mun').value.trim();
@@ -339,7 +396,7 @@ $('b-descargas').addEventListener('click', () => {
     const A = cuenta(sf), F = A.filter((a) => a.foto).length;
     const nC = A.filter((a) => tipoDe(a) === 'congreso').length, nS = A.length - nC;
     $('d-opciones').innerHTML = `
-      <a class="dopc" href="${url('datos=1', sf)}"><span class="big">📊</span><div><b>Todos los datos</b><br><span class="muted">${fmt(nC)} actas del Congreso y ${fmt(nS)} del Senado, con todos los votos, y los resultados por municipio. Se abren con Excel.</span></div></a>
+      <a class="dopc" href="${url('datos=1', sf)}"><span class="big">📊</span><div><b>Todos los datos</b><br><span class="muted">${fmt(nC)} actas del Congreso y ${fmt(nS)} del Senado, con todos los votos, los resultados por municipio y las reclamaciones. Se abren con Excel.</span></div></a>
       <a class="dopc" href="${url('fotos=1', sf)}"><span class="big">🖼️</span><div><b>Todas las fotos</b><br><span class="muted">${fmt(F)} fotos en un ZIP, en carpetas por Congreso/Senado, provincia y municipio.</span></div></a>
       <a class="dopc" href="${url('datos=1&fotos=1', sf)}"><span class="big">📦</span><div><b>Todo junto</b><br><span class="muted">Datos y fotos en un solo ZIP. Ideal como copia de seguridad.</span></div></a>
       <div class="row" style="gap:8px;margin-top:6px"><span class="muted">Solo un tipo, en CSV:</span>
@@ -393,11 +450,11 @@ async function subirCSV(fileId, url, msgId, extra = {}) {
   } catch (e) { $(msgId).textContent = '⚠ ' + e.message + (e.data?.errores?.length ? ' — ' + e.data.errores.slice(0, 3).join('; ') : ''); }
 }
 $('b-borrar-todas').addEventListener('click', async () => {
-  const c = prompt('Esto borra TODAS las actas recibidas (por ejemplo, las de prueba). Escribe BORRAR para confirmar:');
+  const c = prompt('Esto borra TODAS las actas y reclamaciones recibidas (por ejemplo, las de prueba). Escribe BORRAR para confirmar:');
   if (c !== 'BORRAR') return;
   try {
     const r = await api('/api/admin/borrar-todas', { method: 'POST', body: { confirmacion: 'BORRAR' } });
-    $('c-borrar-msg').textContent = `✓ ${r.borradas} actas borradas`; refrescar();
+    $('c-borrar-msg').textContent = `✓ ${r.borradas} actas y ${r.reclamaciones || 0} reclamaciones borradas`; refrescar();
   } catch (e) { $('c-borrar-msg').textContent = '⚠ ' + e.message; }
 });
 $('b-dist').addEventListener('click', () => subirCSV('c-dist-file', '/api/admin/distritos', 'c-dist-msg'));

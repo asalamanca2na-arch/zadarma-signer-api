@@ -90,6 +90,7 @@
     <div class="tabs">
       <button data-tab="t-res" class="on">Resultados</button>
       <button data-tab="t-actas">Actas e incidencias <span id="tab-inc"></span></button>
+      <button data-tab="t-recl">📝 Reclamaciones <span id="tab-recl"></span></button>
       <button data-tab="t-conf">Configuración</button>
     </div>
 
@@ -129,6 +130,16 @@
       <div class="card">
         <h2>⏳ Mesas pendientes</h2>
         <div id="pend"></div>
+      </div>
+    </div>
+
+    <!-- RECLAMACIONES -->
+    <div id="t-recl" class="tab hidden">
+      <div class="card">
+        <div class="filters">
+          <div><label class="checkline"><input type="checkbox" id="f-recl-pend"> Solo sin revisar</label></div>
+        </div>
+        <div class="tablewrap" style="margin-top:10px"><table id="t-rec"></table></div>
       </div>
     </div>
 

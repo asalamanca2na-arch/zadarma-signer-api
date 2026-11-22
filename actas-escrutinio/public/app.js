@@ -72,7 +72,7 @@ async function vaciarCola() {
   try {
     for (const p of await DB.all()) {
       try {
-        await api('/api/actas', { method: 'POST', body: p });
+        await api(p.clase === 'reclamacion' ? '/api/reclamaciones' : '/api/actas', { method: 'POST', body: p });
         await DB.del(p.clientId);
       } catch (e) {
         if (!e.status) break; // sin conexión: lo intentamos más tarde
@@ -98,8 +98,8 @@ async function pintarInicio() {
   let enviadas = store.get('mis-actas', []);
   try { enviadas = await api('/api/mis-actas'); store.set('mis-actas', enviadas); } catch {}
   const items = [
-    ...pend.map((p) => `<li><div class="grow"><b>${nombreTipo(p.tipo)} · ${esc(p.ubicacion.municipio)}</b><div class="muted">Dist. ${esc(p.ubicacion.distrito)} · Secc. ${esc(p.ubicacion.seccion)} · Mesa ${esc(p.ubicacion.mesa)}</div></div><span class="pill wait">Pendiente</span></li>`),
-    ...enviadas.sort((a, b) => b.recibido.localeCompare(a.recibido)).map((a) => `<li class="clic" data-acta="${esc(a.id)}"><div class="grow"><b>${nombreTipo(a.tipo)} · ${esc(a.municipio)}</b><div class="muted">Dist. ${esc(a.distrito)} · Secc. ${esc(a.seccion)} · Mesa ${esc(a.mesa)} · ${new Date(a.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</div></div><span class="pill ${a.cuadra ? 'ok' : 'bad'}">${a.cuadra ? 'Enviada' : 'Enviada · revisar'}</span><span class="flecha">›</span></li>`),
+    ...pend.map((p) => `<li><div class="grow"><b>${p.clase === 'reclamacion' ? '📝 Reclamación' : nombreTipo(p.tipo)} · ${esc(p.ubicacion.municipio)}</b><div class="muted">Dist. ${esc(p.ubicacion.distrito)} · Secc. ${esc(p.ubicacion.seccion)} · Mesa ${esc(p.ubicacion.mesa)}</div></div><span class="pill wait">Pendiente</span></li>`),
+    ...enviadas.sort((a, b) => b.recibido.localeCompare(a.recibido)).map((a) => `<li class="clic" data-acta="${esc(a.id)}"><div class="grow"><b>${a.clase === 'reclamacion' ? '📝 Reclamación' : nombreTipo(a.tipo)} · ${esc(a.municipio)}</b><div class="muted">Dist. ${esc(a.distrito)} · Secc. ${esc(a.seccion)} · Mesa ${esc(a.mesa)} · ${new Date(a.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</div></div>${a.clase === 'reclamacion' ? `<span class="pill ${a.revisada ? 'ok' : 'wait'}">${a.revisada ? 'Revisada' : 'Enviada'}</span>` : `<span class="pill ${a.cuadra ? 'ok' : 'bad'}">${a.cuadra ? 'Enviada' : 'Enviada · revisar'}</span>`}<span class="flecha">›</span></li>`),
   ];
   $('h-lista').innerHTML = items.join('') || '<li class="muted">Todavía no has enviado ninguna.</li>';
   misActas = Object.fromEntries(enviadas.map((a) => [a.id, a]));
@@ -109,6 +109,7 @@ async function pintarInicio() {
 let misActas = {};
 function verMiActa(a) {
   if (!a) return;
+  if (a.clase === 'reclamacion') return verMiReclamacion(a);
   const sen = a.tipo === 'senado';
   const lista = sen ? (cfg.senado?.[a.provincia] || []).map((c) => [c.nombre, c.partido, c.id]) : partidosDe(a.provincia).map((p) => [p.nombre, '', p.id]);
   const fila = (k, v, sub = '') => `<tr><td>${esc(k)}${sub ? `<br><span class="muted" style="font-size:.8rem">${esc(sub)}</span>` : ''}</td><td class="n">${v ?? '—'}</td></tr>`;
@@ -146,6 +147,57 @@ function verMiActa(a) {
     $('mc-enviar').disabled = false;
   };
 }
+
+function verMiReclamacion(r) {
+  modal(`<div class="ficha">
+    <div class="row" style="justify-content:space-between"><span class="badge">📝 Reclamación</span><button class="btn ghost small" data-close>✕</button></div>
+    <h2 style="margin:8px 0 2px">${esc(r.municipio)}</h2>
+    <div class="muted">${esc(r.colegio || '')} · Distrito ${Number(r.distrito)} · Sección ${Number(r.seccion)} · Mesa ${esc(r.mesa)} · ${r.tipo === 'senado' ? 'Senado' : r.tipo === 'congreso' ? 'Congreso' : 'Congreso y Senado'}</div>
+    <div class="muted" style="margin-top:2px">Enviada ${new Date(r.recibido).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${r.revisada ? '✓ revisada por el equipo' : 'pendiente de revisar'}</div>
+    <p class="aviso-lectura">👁 Solo para consultar. No se puede modificar.</p>
+    ${r.hayFoto ? `<img class="foto-ficha" src="/api/mis-actas/foto?id=${encodeURIComponent(r.id)}&d=${encodeURIComponent(dispositivo)}" alt="Foto de la reclamación">` : '<p class="muted">Enviada sin foto.</p>'}
+    <p style="margin-top:12px"><b>Reclamación:</b> ${esc(r.texto || '—')}</p>
+    <button class="btn secondary" data-close style="margin-top:10px">Cerrar</button></div>`);
+  $('modal-box').classList.add('larga');
+}
+
+// ---------- reclamaciones: foto → mesa → texto → enviar ----------
+function nuevaReclamacion(conFoto) {
+  nuevoBorrador(null); borrador.clase = 'reclamacion';
+  if (conFoto) $('i-camara').click(); else irUbicacion();
+}
+$('b-recl-foto').addEventListener('click', () => nuevaReclamacion(true));
+$('b-recl-sinfoto').addEventListener('click', () => nuevaReclamacion(false));
+function irReclamacion() {
+  const u = borrador.ubicacion, L = borrador.lectura;
+  $('r-mun').textContent = `${u.municipio} (${u.provincia})`;
+  $('r-mesa').textContent = `${u.colegio} · Distrito ${u.distrito} · Sección ${u.seccion} · Mesa ${u.mesa}`;
+  $('r-thumb').classList.toggle('hidden', !borrador.foto);
+  if (borrador.foto) $('r-thumb').src = borrador.foto;
+  if (borrador.rTexto == null) { borrador.rTexto = L?.reclamacionTexto || ''; borrador.rReclamante = L?.reclamante || ''; }
+  $('r-texto').value = borrador.rTexto; $('r-reclamante').value = borrador.rReclamante;
+  avisoLectura('r-ia', L && L.reclamacionTexto ? L : null, '');
+  show('s-recl');
+}
+$('r-texto').addEventListener('input', () => { borrador.rTexto = $('r-texto').value; });
+$('r-reclamante').addEventListener('input', () => { borrador.rReclamante = $('r-reclamante').value; });
+$('r-thumb').addEventListener('click', () => modal(`<img class="zoom" src="${borrador.foto}" alt=""><div style="height:10px"></div><button class="btn" data-close>Cerrar</button>`));
+$('b-recl-enviar').addEventListener('click', async () => {
+  const texto = $('r-texto').value.trim();
+  if (texto.length < 3 && !borrador.foto) return alert('Describe la reclamación o adjunta la foto del escrito.');
+  if (!borrador.foto && !confirm('Vas a enviar la reclamación SIN foto del escrito. ¿Seguro?')) return;
+  const envio = { clase: 'reclamacion', tipo: borrador.tipo, nombre: borrador.nombre, clientId: borrador.clientId, ubicacion: borrador.ubicacion, texto, reclamante: $('r-reclamante').value.trim(), foto: borrador.foto || null };
+  modal('<div class="spinner"></div><p>Enviando reclamación…</p>', { cerrar: false });
+  try {
+    await api('/api/reclamaciones', { method: 'POST', body: envio });
+    modal(`<div class="big">✅</div><h2 style="justify-content:center">Reclamación enviada</h2><p>El equipo la revisará. La tienes en «Mis actas enviadas».</p><button class="btn" data-close>OK</button>`);
+  } catch (e) {
+    if (e.status && e.status < 500) { modal(`<div class="big">⚠️</div><h2 style="justify-content:center">No se ha enviado</h2><p>${esc(e.message)}</p><button class="btn" data-close>Volver</button>`); return; }
+    await DB.put(envio);
+    modal(`<div class="big">📶</div><h2 style="justify-content:center">Sin conexión</h2><p>La reclamación se ha guardado en el móvil y <b>se enviará sola</b> cuando haya cobertura.</p><button class="btn" data-close>Entendido</button>`);
+  }
+  borrador = null; inicio();
+});
 
 async function inicio() { show('s-home'); await pintarInicio(); vaciarCola(); }
 // La lista se actualiza sola (por ejemplo, si el equipo borra un acta desde el panel).
@@ -208,13 +260,24 @@ $('b-foto-ok').addEventListener('click', leerYContinuar);
 async function leerYContinuar() {
   borrador.lectura = null;
   if (cfg?.lecturaAutomatica && borrador.foto && navigator.onLine !== false) {
-    modal('<div class="spinner"></div><h2 style="justify-content:center">Leyendo el acta…</h2><p>Puede tardar unos segundos.</p><button class="btn secondary" id="b-leer-cancelar">Rellenar a mano</button>', { cerrar: false });
+    modal('<div class="spinner"></div><h2 style="justify-content:center">Leyendo la foto…</h2><p>Puede tardar unos segundos.</p><button class="btn secondary" id="b-leer-cancelar">Rellenar a mano</button>', { cerrar: false });
     let cancelado = false;
     $('b-leer-cancelar').onclick = () => { cancelado = true; cerrarModal(); irUbicacion(); };
     try {
       const r = await api('/api/leer-acta', { method: 'POST', body: { foto: borrador.foto } });
       if (cancelado) return;
       cerrarModal();
+      const L = r.lectura;
+      if (borrador.clase === 'reclamacion' || L.documento === 'reclamacion') {
+        if (borrador.clase !== 'reclamacion') {
+          // Se ha fotografiado una reclamación desde «Sacar foto del acta»: se propone subirla como reclamación.
+          modal('<div class="big">📝</div><h2 style="justify-content:center">Parece un escrito de reclamación</h2><p>¿Quieres subirlo como <b>reclamación</b> de esta mesa?</p><button class="btn" id="b-es-recl">Sí, es una reclamación</button><button class="btn secondary" id="b-no-recl">No, es un acta</button>', { cerrar: false });
+          $('b-es-recl').onclick = () => { cerrarModal(); borrador.clase = 'reclamacion'; aplicarLecturaRecl(L); irUbicacion(); };
+          $('b-no-recl').onclick = () => { cerrarModal(); irUbicacion(); };
+          return;
+        }
+        aplicarLecturaRecl(L); irUbicacion(); return;
+      }
       if (!r.lectura.esActa) {
         modal('<div class="big">🤔</div><h2 style="justify-content:center">La foto no parece un acta</h2><p>Revisa que se vea el acta entera, o rellena los datos a mano.</p><button class="btn" id="b-repetir-foto">Repetir la foto</button><button class="btn secondary" data-close id="b-a-mano">Rellenar a mano</button>');
         $('b-repetir-foto').onclick = () => { cerrarModal(); $('i-camara').click(); };
@@ -229,6 +292,10 @@ async function leerYContinuar() {
     }
   }
   irUbicacion();
+}
+function aplicarLecturaRecl(l) {
+  borrador.lectura = { ...l, votos: {} };
+  borrador.tipo = l.tipo || 'ambas';
 }
 function aplicarLectura(l) {
   borrador.lectura = l;
@@ -284,6 +351,10 @@ async function irUbicacion() {
   marcarTipo();
   $('u-nombre').value = store.get('nombre', '');
   $('u-colegio').value = store.get('colegio', '');
+  const recl = borrador.clase === 'reclamacion';
+  $('u-titulo').textContent = recl ? 'Reclamación · Paso 1 de 2' : 'Paso 1 de 2 · Tus datos y mesa';
+  $('u-tipo-tit').textContent = recl ? '🗳️ ¿De qué elección es la reclamación?' : '📄 ¿Qué acta es?';
+  document.querySelectorAll('.solo-recl').forEach((b) => b.classList.toggle('hidden', !recl));
   show('s-ubic');
 }
 // Congreso o Senado: se elige cada vez (el apoderado suele enviar las dos actas de la mesa).
@@ -372,7 +443,7 @@ $('b-manual').addEventListener('click', () => modoManual(modo !== 'manual'));
 
 $('b-ubic-ok').addEventListener('click', async () => {
   const err = (t) => { $('u-err').textContent = t; $('u-err').classList.remove('hidden'); };
-  if (!borrador.tipo) return err('Elige arriba si el acta es del Congreso o del Senado.');
+  if (!borrador.tipo) return err(borrador.clase === 'reclamacion' ? 'Elige arriba de qué elección es la reclamación.' : 'Elige arriba si el acta es del Congreso o del Senado.');
   const nombre = $('u-nombre').value.trim(), colegio = $('u-colegio').value.trim();
   if (nombre.length < 3) return err('Escribe tu nombre y apellido.');
   if (colegio.length < 3) return err('Escribe el nombre del colegio electoral.');
@@ -392,6 +463,7 @@ $('b-ubic-ok').addEventListener('click', async () => {
   u.colegio = colegio;
   borrador.ubicacion = u; borrador.nombre = nombre;
   store.set('ultima-mesa', u);
+  if (borrador.clase === 'reclamacion') return irReclamacion();
   // ¿Otra persona ya ha enviado el acta de esta mesa? Se avisa para no duplicarla.
   if (navigator.onLine !== false) {
     let ex = null;

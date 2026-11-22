@@ -110,3 +110,6 @@ input.revisar { background: #fff6d6; border-color: #e0b400; }
 .comentario h3 { margin: 0 0 8px; font-size: 1.05rem; }
 .comentario textarea { min-height: 70px; margin-bottom: 8px; background: #fff; }
 .com-enviado { background: #fff; border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; font-size: .92rem; }
+
+.recl-card { border: 1.5px dashed #e0b400; background: #fffdf3; }
+.tipo:has(.solo-recl:not(.hidden)) { grid-template-columns: 1fr 1fr 1fr; }
