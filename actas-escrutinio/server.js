@@ -46,6 +46,7 @@ const PROVINCIAS = ['Barcelona', 'Girona', 'Lleida', 'Tarragona'];
 // Elecciones generales 29-N-2026, Congreso. Candidaturas proclamadas según el BOE-A-2026-23103.
 // "orden" = posición de la candidatura en el acta/papeleta de cada provincia (si no aparece, no se presenta allí).
 const DEFAULT_CONFIG = {
+  boeRev: 2,
   eleccion: 'Generales 29-N 2026 · Congreso',
   partidos: [
     { id: 'psc', nombre: 'PSC', color: '#e30613', orden: { Barcelona: 1, Girona: 1, Lleida: 1, Tarragona: 1 } },
@@ -58,8 +59,9 @@ const DEFAULT_CONFIG = {
     { id: 'fo', nombre: 'Frente Obrero (FO)', color: '#9e1b1b', orden: { Barcelona: 4, Girona: 2, Lleida: 3, Tarragona: 3 } },
     { id: 'salf', nombre: 'Se Acabó La Fiesta (SALF)', color: '#6b4f2a', orden: { Barcelona: 5, Tarragona: 6 } },
     { id: 'pctc', nombre: 'PCTC', color: '#c00000', orden: { Barcelona: 6, Girona: 6, Lleida: 6, Tarragona: 5 } },
-    { id: 'pacma', nombre: 'PACMA', color: '#2e9e57', orden: { Barcelona: 12, Girona: 7, Lleida: 8, Tarragona: 9 } },
-    { id: 'mundo-justo', nombre: 'Por un Mundo más Justo', color: '#7a8a99', orden: { Barcelona: 10, Tarragona: 11 } },
+    // PACMA y Por un Mundo más Justo: «No proclamada» en Barcelona según el BOE, por eso no figuran allí.
+    { id: 'pacma', nombre: 'PACMA', color: '#2e9e57', orden: { Girona: 7, Lleida: 8, Tarragona: 9 } },
+    { id: 'mundo-justo', nombre: 'Por un Mundo más Justo', color: '#7a8a99', orden: { Tarragona: 11 } },
     { id: 'd21', nombre: 'Democracia S.21 (D21)', color: '#5a6b7b', orden: { Barcelona: 11 } },
     { id: 'cnv', nombre: 'Convergents (CNV)', color: '#003f7f', orden: { Tarragona: 10 } },
   ],
@@ -472,6 +474,11 @@ const mesasFile = path.join(DATA_DIR, 'mesas.json');
 
 let config = readJSON(configFile, null);
 if (!config) { config = DEFAULT_CONFIG; writeJSON(configFile, config); }
+// Corrección BOE (rev. 2): en Barcelona, PACMA y Por un Mundo más Justo figuran como «No proclamada» en el Congreso.
+if ((config.boeRev || 1) < 2) {
+  for (const id of ['pacma', 'mundo-justo']) { const p = config.partidos.find((x) => x.id === id); if (p?.orden?.Barcelona != null) delete p.orden.Barcelona; }
+  config.boeRev = 2; writeJSON(configFile, config);
+}
 if (!config.senado) { config.senado = DEFAULT_SENADO; config.eleccion = 'Generales 29-N 2026'; writeJSON(configFile, config); }
 const TIPOS = ['congreso', 'senado'];
 // Claves de voto de un acta: candidaturas (Congreso) o candidatos de la provincia (Senado).
@@ -1416,7 +1423,7 @@ async function handle(req, res) {
           senado[pr].push({ id, nombre, partido, color: /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : (partidos.find((x) => norm(x.nombre) === norm(partido))?.color || '#888888') });
         }
       }
-      config = { eleccion: String(b.eleccion || config.eleccion).trim(), partidos, senado };
+      config = { boeRev: config.boeRev, eleccion: String(b.eleccion || config.eleccion).trim(), partidos, senado };
       writeJSON(configFile, config);
       return send(res, 200, { ok: true, config });
     }

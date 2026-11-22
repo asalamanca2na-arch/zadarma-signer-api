@@ -530,7 +530,8 @@ function irVotos() {
       }).join('');
     } else {
       caja.className = 'grid2';
-      caja.innerHTML = listaVotos('congreso', u.provincia).map((p) => `<div><label for="p-${esc(p.id)}" class="party"><span class="dot" style="background:${esc(p.color)}"></span>${p.orden?.[u.provincia] ? p.orden[u.provincia] + '. ' : ''}${esc(p.nombre)}</label><input id="p-${esc(p.id)}" inputmode="numeric" pattern="[0-9]*"></div>`).join('');
+      // Número = posición en el acta de esa provincia (solo candidaturas proclamadas, en el orden del BOE).
+      caja.innerHTML = listaVotos('congreso', u.provincia).map((p, i) => `<div><label for="p-${esc(p.id)}" class="party"><span class="dot" style="background:${esc(p.color)}"></span>${i + 1}. ${esc(p.nombre)}</label><input id="p-${esc(p.id)}" inputmode="numeric" pattern="[0-9]*"></div>`).join('');
     }
     caja.dataset.hecho = hecho;
     caja.querySelectorAll('input').forEach((i) => i.addEventListener('input', recalcular));

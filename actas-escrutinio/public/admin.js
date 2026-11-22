@@ -245,9 +245,10 @@ function pintarActas(L) {
 // Candidaturas (Congreso) o candidatos (Senado) del acta, en el MISMO ORDEN que la papeleta/acta de su provincia.
 function ordenActa(a) {
   if (a.tipo === 'senado') return (datos.config.senado?.[a.provincia] || []).map((c, i) => [`${i + 1}. ${c.nombre} (${c.partido})`, c.id]);
-  return datos.config.partidos.filter((p) => a.votos && p.id in a.votos)
-    .map((p, i) => ({ p, n: p.orden?.[a.provincia] ?? 1000 + i })).sort((x, y) => x.n - y.n)
-    .map(({ p, n }) => [n < 1000 ? `${n}. ${p.nombre}` : p.nombre, p.id]);
+  // Orden del BOE de la provincia; el número es la posición en el acta (solo candidaturas proclamadas allí).
+  const enActa = datos.config.partidos.filter((p) => p.orden?.[a.provincia] != null).sort((x, y) => x.orden[a.provincia] - y.orden[a.provincia]);
+  const otras = datos.config.partidos.filter((p) => p.orden?.[a.provincia] == null && a.votos && p.id in a.votos && a.votos[p.id]);
+  return [...enActa.map((p, i) => [`${i + 1}. ${p.nombre}`, p.id]), ...otras.map((p) => [`${p.nombre} (no está en el acta)`, p.id])];
 }
 function tablaVotos(a, actual) {
   const sen = a.tipo === 'senado';
