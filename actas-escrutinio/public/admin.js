@@ -283,6 +283,7 @@ async function verActa(id) {
         <div class="status ${a.cuadra ? 'ok' : 'bad'}">${estado}</div>
         ${(a.avisos || []).length ? `<p class="warn" style="margin-top:10px">${a.avisos.map(esc).join('<br>')}</p>` : ''}
         ${a.observaciones ? `<p><b>Observaciones:</b> ${esc(a.observaciones)}</p>` : ''}
+        ${(a.comentarios || []).length ? `<div class="coms"><b>💬 Comentarios de los apoderados</b>${a.comentarios.map((c) => `<div class="com ${c.leido ? 'leido' : ''}"><div>«${esc(c.texto)}»</div><div class="muted">${esc(c.nombre || 'Sin nombre')} · ${new Date(c.fecha).toLocaleString('es-ES')}${c.leido ? ' · revisado' : ' · <b>pendiente</b>'}</div></div>`).join('')}</div>` : ''}
         ${tablaVotos(a)}
         <p class="muted">Enviada por <b>${esc(a.enviadoPor?.nombre || 'Sin nombre')}</b> · ${new Date(a.recibido).toLocaleString('es-ES')}${conf ? `<br>✓ Confirmada con los mismos números por: ${conf}` : ''}</p>
         ${hist ? `<details ${a.conflicto && !a.revisada ? 'open' : ''}><summary><b>⚠ ${a.historial.length} versión(es) anterior(es) con números distintos</b></summary>${hist}</details>` : ''}

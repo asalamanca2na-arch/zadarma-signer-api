@@ -96,3 +96,17 @@ a { color: var(--primary); }
 .ia { background: #eef4ff; border: 1px solid #c9dafc; color: #163b7a; border-radius: 12px; padding: 12px 14px; margin: 10px 0; font-size: .95rem; }
 .ia small { color: #7a4d00; }
 input.revisar { background: #fff6d6; border-color: #e0b400; }
+
+.list li.clic { cursor: pointer; }
+.list li .flecha { color: var(--muted); font-size: 1.4rem; line-height: 1; }
+.modal .box.larga { max-height: 92vh; overflow-y: auto; text-align: left; }
+.ficha h2 { justify-content: flex-start; }
+.aviso-lectura { background: #f1f4f8; border-radius: 10px; padding: 8px 12px; font-size: .9rem; color: var(--muted); margin: 10px 0; }
+.foto-ficha { width: 100%; border-radius: 10px; border: 1px solid var(--line); display: block; }
+.tabla-ficha { width: 100%; border-collapse: collapse; font-size: .95rem; }
+.tabla-ficha td { padding: 7px 4px; border-bottom: 1px solid var(--line); }
+.tabla-ficha td.n { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.comentario { margin-top: 14px; background: #fff6dd; border-radius: 12px; padding: 12px; }
+.comentario h3 { margin: 0 0 8px; font-size: 1.05rem; }
+.comentario textarea { min-height: 70px; margin-bottom: 8px; background: #fff; }
+.com-enviado { background: #fff; border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; font-size: .92rem; }

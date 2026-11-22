@@ -26,7 +26,7 @@ function modal(html, { cerrar = true } = {}) {
   $('modal').classList.add('open');
   if (cerrar) $('modal-box').querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', cerrarModal));
 }
-function cerrarModal() { $('modal').classList.remove('open'); }
+function cerrarModal() { $('modal').classList.remove('open'); $('modal-box').classList.remove('larga'); }
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- API ----------
@@ -99,10 +99,54 @@ async function pintarInicio() {
   try { enviadas = await api('/api/mis-actas'); store.set('mis-actas', enviadas); } catch {}
   const items = [
     ...pend.map((p) => `<li><div class="grow"><b>${nombreTipo(p.tipo)} · ${esc(p.ubicacion.municipio)}</b><div class="muted">Dist. ${esc(p.ubicacion.distrito)} · Secc. ${esc(p.ubicacion.seccion)} · Mesa ${esc(p.ubicacion.mesa)}</div></div><span class="pill wait">Pendiente</span></li>`),
-    ...enviadas.sort((a, b) => b.recibido.localeCompare(a.recibido)).map((a) => `<li><div class="grow"><b>${nombreTipo(a.tipo)} · ${esc(a.municipio)}</b><div class="muted">Dist. ${esc(a.distrito)} · Secc. ${esc(a.seccion)} · Mesa ${esc(a.mesa)} · ${new Date(a.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</div></div><span class="pill ${a.cuadra ? 'ok' : 'bad'}">${a.cuadra ? 'Enviada' : 'Enviada · revisar'}</span></li>`),
+    ...enviadas.sort((a, b) => b.recibido.localeCompare(a.recibido)).map((a) => `<li class="clic" data-acta="${esc(a.id)}"><div class="grow"><b>${nombreTipo(a.tipo)} · ${esc(a.municipio)}</b><div class="muted">Dist. ${esc(a.distrito)} · Secc. ${esc(a.seccion)} · Mesa ${esc(a.mesa)} · ${new Date(a.recibido).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</div></div><span class="pill ${a.cuadra ? 'ok' : 'bad'}">${a.cuadra ? 'Enviada' : 'Enviada · revisar'}</span><span class="flecha">›</span></li>`),
   ];
   $('h-lista').innerHTML = items.join('') || '<li class="muted">Todavía no has enviado ninguna.</li>';
+  misActas = Object.fromEntries(enviadas.map((a) => [a.id, a]));
+  $('h-lista').querySelectorAll('[data-acta]').forEach((li) => li.addEventListener('click', () => verMiActa(misActas[li.dataset.acta])));
 }
+// ---------- ver un acta enviada (solo lectura) y comentar ----------
+let misActas = {};
+function verMiActa(a) {
+  if (!a) return;
+  const sen = a.tipo === 'senado';
+  const lista = sen ? (cfg.senado?.[a.provincia] || []).map((c) => [c.nombre, c.partido, c.id]) : partidosDe(a.provincia).map((p) => [p.nombre, '', p.id]);
+  const fila = (k, v, sub = '') => `<tr><td>${esc(k)}${sub ? `<br><span class="muted" style="font-size:.8rem">${esc(sub)}</span>` : ''}</td><td class="n">${v ?? '—'}</td></tr>`;
+  const estado = a.cuadra ? (sen ? '✓ Datos coherentes' : '✓ Los votos cuadran') : sen ? '⚠ Hay datos que revisar' : `⚠ ${a.diferencia > 0 ? 'Faltan ' + a.diferencia : 'Sobran ' + -a.diferencia} votos`;
+  const quien = a.mia ? 'Enviada por ti' : `Enviada por ${esc(a.enviadoPor || 'otro apoderado')}`;
+  modal(`<div class="ficha">
+    <div class="row" style="justify-content:space-between"><span class="badge">${nombreTipo(a.tipo)}</span><button class="btn ghost small" data-close>✕</button></div>
+    <h2 style="margin:8px 0 2px">${esc(a.municipio)}</h2>
+    <div class="muted">${esc(a.colegio || '')} · Distrito ${Number(a.distrito)} · Sección ${Number(a.seccion)} · Mesa ${esc(a.mesa)}</div>
+    <div class="muted" style="margin-top:2px">${quien} · ${new Date(a.recibido).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${a.confirmadaPor?.length ? ` · confirmada por ${esc(a.confirmadaPor.join(', '))}` : ''}</div>
+    <p class="aviso-lectura">👁 Solo para consultar. No se puede modificar.</p>
+    ${a.hayFoto ? `<img class="foto-ficha" src="/api/mis-actas/foto?id=${encodeURIComponent(a.id)}&d=${encodeURIComponent(dispositivo)}" alt="Foto del acta">` : '<p class="muted">Enviada sin foto.</p>'}
+    <div class="status ${a.cuadra ? 'ok' : 'bad'}" style="margin:10px 0">${estado}</div>
+    <table class="tabla-ficha">${fila('Electores (censo)', a.censo)}${fila('Votantes', a.votantes)}${fila(sen ? 'Papeletas nulas' : 'Votos nulos', a.nulos)}${fila(sen ? 'Papeletas en blanco' : 'Votos en blanco', a.blancos)}
+      ${lista.map(([n, sub, id]) => fila(n, a.votos?.[id] ?? 0, sub)).join('')}</table>
+    ${a.observaciones ? `<p><b>Observaciones:</b> ${esc(a.observaciones)}</p>` : ''}
+    <div class="comentario">
+      <h3>💬 ¿Ves algo mal?</h3>
+      ${(a.comentarios || []).map((c) => `<div class="com-enviado">«${esc(c.texto)}»<br><span class="muted">Enviado ${new Date(c.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} · el equipo lo revisará</span></div>`).join('')}
+      <textarea id="mc-texto" placeholder="Ej.: el PP tiene 210 votos, no 201"></textarea>
+      <button class="btn" id="mc-enviar">Enviar comentario</button>
+      <div id="mc-msg" class="muted"></div>
+    </div>
+    <button class="btn secondary" data-close style="margin-top:10px">Cerrar</button></div>`);
+  $('modal-box').classList.add('larga');
+  $('mc-enviar').onclick = async () => {
+    const texto = $('mc-texto').value.trim();
+    if (texto.length < 3) { $('mc-msg').textContent = 'Escribe qué has visto mal.'; return; }
+    $('mc-enviar').disabled = true;
+    try {
+      await api('/api/mis-actas/comentario', { method: 'POST', body: { id: a.id, texto, nombre: store.get('nombre', '') } });
+      (a.comentarios ||= []).push({ texto, fecha: new Date().toISOString() });
+      $('mc-texto').value = ''; $('mc-msg').innerHTML = '✅ <b>Comentario enviado.</b> El equipo lo revisará.';
+    } catch (e) { $('mc-msg').textContent = e.status ? e.message : 'Sin conexión: inténtalo cuando tengas cobertura.'; }
+    $('mc-enviar').disabled = false;
+  };
+}
+
 async function inicio() { show('s-home'); await pintarInicio(); vaciarCola(); }
 // La lista se actualiza sola (por ejemplo, si el equipo borra un acta desde el panel).
 const enInicio = () => $('s-home').classList.contains('active') && !$('modal').classList.contains('open');

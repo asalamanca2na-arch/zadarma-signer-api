@@ -685,6 +685,8 @@ function calcula(a) {
   if (Object.keys(MUNICIPIOS).length && !municipioOficial(a.provincia, a.municipio) && !m) avisos.push('Municipio no reconocido');
   if (a.conflicto) avisos.push('Hay otra versión distinta del acta');
   if (a.observaciones) avisos.push('Tiene observaciones');
+  const pend = (a.comentarios || []).filter((c) => !c.leido).length;
+  if (pend) avisos.push(`${pend} comentario(s) del apoderado`);
   a.avisos = avisos;
   a.incidencia = avisos.length > 0;
   return a;
@@ -1009,12 +1011,46 @@ async function handle(req, res) {
     if (!a) return send(res, 200, { existe: false });
     return send(res, 200, { existe: true, nombre: a.enviadoPor?.nombre || '', recibido: a.recibido, colegio: a.colegio, mia: !!dispositivo && a.enviadoPor?.dispositivo === dispositivo });
   }
+  // Actas en las que ha participado este móvil (enviadas, confirmadas o con una versión suya).
+  const deEsteMovil = (a) => !!dispositivo && (a.enviadoPor?.dispositivo === dispositivo ||
+    (a.historial || []).some((h) => h.enviadoPor?.dispositivo === dispositivo) ||
+    (a.confirmaciones || []).some((c) => c.dispositivo === dispositivo));
+  // Lo que ve el apoderado: sin identificadores de otros móviles ni historial.
+  const paraApoderado = (a) => ({
+    id: a.id, tipo: a.tipo || 'congreso', provincia: a.provincia, municipio: a.municipio, colegio: a.colegio, distrito: a.distrito, seccion: a.seccion, mesa: a.mesa,
+    censo: a.censo, votantes: a.votantes, nulos: a.nulos, blancos: a.blancos, votos: a.votos, cuadra: a.cuadra, diferencia: a.diferencia,
+    observaciones: a.observaciones, recibido: a.recibido, hayFoto: !!a.foto,
+    enviadoPor: a.enviadoPor?.nombre || '', mia: a.enviadoPor?.dispositivo === dispositivo,
+    confirmadaPor: (a.confirmaciones || []).map((c) => c.nombre),
+    comentarios: (a.comentarios || []).filter((c) => c.dispositivo === dispositivo).map(({ texto, fecha }) => ({ texto, fecha })),
+  });
   if (p === '/api/mis-actas' && m === 'GET') {
     if (!dispositivo) return send(res, 200, []);
-    return send(res, 200, [...actas.values()].filter((a) => a.enviadoPor?.dispositivo === dispositivo ||
-      (a.historial || []).some((h) => h.enviadoPor?.dispositivo === dispositivo) ||
-      (a.confirmaciones || []).some((c) => c.dispositivo === dispositivo)).map(resumenActa));
+    return send(res, 200, [...actas.values()].filter(deEsteMovil).map(paraApoderado));
   }
+  // Foto de un acta propia (el apoderado solo ve las de sus actas). El identificador del móvil va en la URL para poder usarla en <img>.
+  if (p === '/api/mis-actas/foto' && m === 'GET') {
+    const a = actas.get(url.searchParams.get('id') || '');
+    const d = String(url.searchParams.get('d') || '').replace(/[^a-zA-Z0-9-]/g, '');
+    const suya = a && d && (a.enviadoPor?.dispositivo === d || (a.historial || []).some((h) => h.enviadoPor?.dispositivo === d) || (a.confirmaciones || []).some((c) => c.dispositivo === d));
+    if (!suya || !a.foto || !fs.existsSync(path.join(FOTOS_DIR, a.foto))) return send(res, 404, 'No encontrada');
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(a.foto)] || 'image/jpeg', 'Cache-Control': 'private, max-age=600' });
+    return fs.createReadStream(path.join(FOTOS_DIR, a.foto)).pipe(res);
+  }
+  // Comentario del apoderado sobre un acta suya (no cambia los datos: avisa al equipo).
+  if (p === '/api/mis-actas/comentario' && m === 'POST') {
+    const b = await readBody(req);
+    const a = actas.get(b.id);
+    const texto = String(b.texto || '').trim().slice(0, 1000);
+    if (!a || !deEsteMovil(a)) return send(res, 404, { error: 'No se encuentra esta acta' });
+    if (texto.length < 3) return send(res, 400, { error: 'Escribe el comentario' });
+    (a.comentarios ||= []).push({ texto, nombre: String(b.nombre || '').trim().slice(0, 80), dispositivo, fecha: new Date().toISOString(), leido: false });
+    a.revisada = false;
+    calcula(a);
+    writeJSON(path.join(ACTAS_DIR, fileIdFor(a.id) + '.json'), a);
+    return send(res, 200, { ok: true });
+  }
+
 
   // --- administración ---
   if (p.startsWith('/api/admin/')) {
@@ -1031,7 +1067,7 @@ async function handle(req, res) {
       const a = actas.get(b.id);
       if (!a) return send(res, 404, { error: 'No existe' });
       a.revisada = !!b.revisada;
-      if (a.revisada) a.conflicto = false;
+      if (a.revisada) { a.conflicto = false; for (const c of a.comentarios || []) c.leido = true; }
       calcula(a);
       writeJSON(path.join(ACTAS_DIR, fileIdFor(a.id) + '.json'), a);
       return send(res, 200, { ok: true });
