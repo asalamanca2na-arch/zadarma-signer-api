@@ -7,7 +7,6 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const lector = require('./lector');
-const ARRANQUE = Date.now();
 const { ZipWriter } = require('./zip');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -1181,13 +1180,6 @@ async function handle(req, res) {
     const b = await readBody(req);
     const mm = typeof b.foto === 'string' && b.foto.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
     if (!mm) return send(res, 400, { error: 'Falta la foto' });
-    // PRUEBA TEMPORAL de modelos (se desactiva sola a las 2 h de publicarse; se quitará tras la prueba).
-    const VARIANTES = { 'opus-medium': ['claude-opus-5-5', 'medium'], 'opus-low': ['claude-opus-5-5', 'low'], 'sonnet-medium': ['claude-sonnet-5-5', 'medium'], 'haiku-medium': ['claude-haiku-5-5', 'medium'] };
-    if (b.variante && VARIANTES[b.variante] && Date.now() < ARRANQUE + 2 * 3600 * 1000) {
-      const [modelo, effort] = VARIANTES[b.variante]; const t0 = Date.now();
-      const { datos, uso } = await lector.leerActa({ fotoBase64: mm[2], mediaType: mm[1], config, provincias: PROVINCIAS, modelo, effort });
-      return send(res, 200, { ok: true, lectura: normalizarLectura(datos), uso, ms: Date.now() - t0, modelo, effort });
-    }
     const h = hashFoto(mm[2]);
     if (lecturasCache.has(h)) return send(res, 200, { ok: true, lectura: lecturasCache.get(h) });
     const t0 = Date.now();
